@@ -4,7 +4,10 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
-const { sendPasswordResetEmail } = require("../utils/emailService");
+const {
+  sendPasswordResetEmail,
+  sendWelcomeEmail,
+} = require("../utils/emailService");
 
 // POST /api/auth/signup
 router.post("/signup", async (req, res) => {
@@ -24,6 +27,16 @@ router.post("/signup", async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
+
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(user.name, user.email);
+      console.log(`Welcome email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError);
+      // Continue with signup process even if email fails
+    }
+
     res.json({
       token,
       user: { id: user._id, name: user.name, email: user.email },

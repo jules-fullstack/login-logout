@@ -6,21 +6,26 @@ import LoadingSpinner from "./LoadingSpinner";
 export default function Signup() {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const { signup, error, setError } = useAuth();
   const navigate = useNavigate();
-
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
     setIsLoading(true);
 
     try {
       const success = await signup(form.name, form.email, form.password);
 
       if (success) {
-        navigate("/");
+        setSuccessMessage(`Account created successfully! A welcome email has been sent to ${form.email}.`);
+        // Navigate after a short delay to let the user see the success message
+        setTimeout(() => {
+          navigate("/");
+        }, 3000);
       } else {
         setIsLoading(false);
       }
@@ -54,9 +59,9 @@ export default function Signup() {
           type="password"
           onChange={onChange}
           required
-          disabled={isLoading}
-        />
+          disabled={isLoading}        />
         {error && <div className="error-message">{error}</div>}
+        {successMessage && <div className="success-message">{successMessage}</div>}
         <button type="submit" disabled={isLoading}>
           {isLoading ? (
             <>

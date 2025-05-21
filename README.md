@@ -7,6 +7,7 @@ A complete authentication system with login, signup, and password reset function
 - User registration and login
 - JWT-based authentication
 - Password reset via email
+- Welcome email after signup
 - Protected routes
 - Modern UI with responsive design
 
@@ -83,9 +84,9 @@ A complete authentication system with login, signup, and password reset function
    npm run dev
    ```
 
-## Gmail Setup for Password Reset
+## Gmail Setup for Emails
 
-To use Gmail for password reset emails:
+To use Gmail for welcome and password reset emails:
 
 1. Create a Gmail account or use an existing one
 2. Enable 2-Step Verification in your Google Account security settings
