@@ -7,6 +7,7 @@ const User = require("../models/User");
 const {
   sendPasswordResetEmail,
   sendWelcomeEmail,
+  sendVerificationEmail,
 } = require("../utils/emailService");
 
 // POST /api/auth/signup
@@ -20,30 +21,53 @@ router.post("/signup", async (req, res) => {
     // hash
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
-    // create
-    const user = new User({ name, email, password: hash });
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(20).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(verificationToken)
+      .digest("hex");
+
+    // create unverified user
+    const user = new User({
+      name,
+      email,
+      password: hash,
+      isVerified: false,
+      verificationToken: hashedToken,
+      verificationExpires: new Date(Date.now() + 86400000), // 24 hours
+    });
     await user.save();
-    // sign
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
 
-    // Send welcome email
+    // Send verification email
     try {
-      await sendWelcomeEmail(user.name, user.email);
-      console.log(`Welcome email sent to ${user.email}`);
-    } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError);
-      // Continue with signup process even if email fails
-    }
+      const emailSent = await sendVerificationEmail(
+        user.name,
+        user.email,
+        verificationToken
+      );
 
-    res.json({
-      token,
-      user: { id: user._id, name: user.name, email: user.email },
-    });
+      if (emailSent) {
+        return res.json({
+          msg: "Registration pending. Verification email sent.",
+          email: user.email,
+        });
+      } else {
+        return res
+          .status(500)
+          .json({ msg: "Failed to send verification email" });
+      }
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+      return res.status(500).json({
+        msg: "Failed to send verification email",
+        error: emailError.message,
+      });
+    }
   } catch (err) {
     console.error(err);
-    res.status(500).send("Server error");
+    res.status(500).json({ msg: "Server error", error: err.message });
   }
 });
 
@@ -53,6 +77,16 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ msg: "Invalid credentials" });
+
+    // Check if user is verified
+    if (!user.isVerified) {
+      return res.status(401).json({
+        msg: "Please verify your email before logging in",
+        pendingVerification: true,
+        email: user.email,
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
@@ -174,6 +208,159 @@ router.post("/reset-password/:token", async (req, res) => {
   } catch (err) {
     console.error("Reset password error:", err);
     res.status(500).json({ msg: "Server error" });
+  }
+});
+
+// POST /api/auth/resend-verification
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Find user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    // Check if already verified
+    if (user.isVerified) {
+      return res.status(400).json({ msg: "Email already verified" });
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(20).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(verificationToken)
+      .digest("hex"); // Update user's verification token and expiry
+    user.verificationToken = hashedToken;
+    user.verificationExpires = new Date(Date.now() + 86400000); // 24 hours
+    await user.save();
+
+    // Send verification email
+    try {
+      const emailSent = await sendVerificationEmail(
+        user.name,
+        user.email,
+        verificationToken
+      );
+
+      if (emailSent) {
+        return res.json({ msg: "Verification email resent successfully" });
+      } else {
+        return res
+          .status(500)
+          .json({ msg: "Failed to resend verification email" });
+      }
+    } catch (emailError) {
+      console.error("Failed to resend verification email:", emailError);
+      return res.status(500).json({
+        msg: "Failed to resend verification email",
+        error: emailError.message,
+      });
+    }
+  } catch (err) {
+    console.error("Resend verification error:", err);
+    res.status(500).json({ msg: "Server error", error: err.message });
+  }
+});
+
+// POST /api/auth/verify-email/:token
+router.post("/verify-email/:token", async (req, res) => {
+  try {
+    console.log(`Verifying token: ${req.params.token}`);
+
+    // Get hashed token
+    const verificationToken = crypto
+      .createHash("sha256")
+      .update(req.params.token)
+      .digest("hex");
+
+    console.log(`Hashed token: ${verificationToken}`); // Find user with matching token
+    const user = await User.findOne({
+      verificationToken,
+    });
+
+    if (!user) {
+      console.log("No user found with matching token");
+      console.log("Searched for token hash:", verificationToken);
+      return res.status(400).json({
+        msg: "Invalid verification token. Please sign up again.",
+      });
+    }
+
+    console.log(`Found user: ${user.email}, isVerified: ${user.isVerified}`);
+    console.log(`User verification token: ${user.verificationToken}`);
+    console.log(
+      `User verification expires: ${
+        user.verificationExpires
+          ? new Date(user.verificationExpires).toISOString()
+          : "Not set"
+      }`
+    );
+    console.log(`Current time: ${new Date().toISOString()}`);
+
+    // Check if already verified
+    if (user.isVerified) {
+      console.log("User already verified");
+
+      // Generate JWT token for automatic login
+      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+        expiresIn: "1h",
+      });
+
+      return res.json({
+        msg: "Email already verified. You can now log in.",
+        token,
+        user: { id: user._id, name: user.name, email: user.email },
+      });
+    } // Check if token is expired
+    if (user.verificationExpires && user.verificationExpires < Date.now()) {
+      console.log("Token expired:", user.verificationExpires, Date.now());
+      console.log(
+        "Difference in milliseconds:",
+        Date.now() - user.verificationExpires
+      );
+      console.log(
+        "Expiration date:",
+        new Date(user.verificationExpires).toISOString()
+      );
+      console.log("Current date:", new Date().toISOString());
+      return res.status(400).json({
+        msg: "Verification link has expired. Please request a new one.",
+      });
+    }
+
+    // Update user verification status
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationExpires = undefined;
+    await user.save();
+
+    console.log(`User ${user.email} verified successfully`);
+
+    // Send welcome email after verification
+    try {
+      await sendWelcomeEmail(user.name, user.email);
+      console.log(`Welcome email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError);
+      // Continue with verification process even if welcome email fails
+    }
+
+    // Generate JWT token for automatic login
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    res.json({
+      msg: "Email verification successful!",
+      token,
+      user: { id: user._id, name: user.name, email: user.email },
+    });
+  } catch (err) {
+    console.error("Email verification error:", err);
+    res.status(500).json({ msg: "Server error", error: err.message });
   }
 });
 

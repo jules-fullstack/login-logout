@@ -9,6 +9,7 @@ import Login from "./components/Login";
 import Home from "./components/Home";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPassword from "./components/ResetPassword";
+import VerifyEmail from "./components/VerifyEmail";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 
 // Protected route component
@@ -62,6 +63,7 @@ function AppRoutes() {
       />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
+      <Route path="/verify-email/:token" element={<VerifyEmail />} />
       <Route
         path="/"
         element={

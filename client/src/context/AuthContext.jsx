@@ -35,7 +35,6 @@ export function AuthProvider({ children }) {
 
     checkAuth();
   }, []);
-
   // Login function
   const login = async (email, password) => {
     setError(null);
@@ -57,6 +56,16 @@ export function AuthProvider({ children }) {
 
       return true;
     } catch (err) {
+      // Check if this is a verification issue
+      if (err.response?.data?.pendingVerification) {
+        setError("Please verify your email before logging in");
+        return {
+          success: false,
+          pendingVerification: true,
+          email: err.response.data.email,
+        };
+      }
+
       setError(err.response?.data?.msg || "Login failed");
       return false;
     }
@@ -68,7 +77,6 @@ export function AuthProvider({ children }) {
     delete axios.defaults.headers.common["x-auth-token"];
     setUser(null);
   };
-
   // Signup function
   const signup = async (name, email, password) => {
     setError(null);
@@ -80,19 +88,83 @@ export function AuthProvider({ children }) {
         password,
       });
 
-      const { token, user } = res.data;
+      // Return the response data for handling by the signup component
+      return {
+        success: true,
+        data: res.data,
+      };
+    } catch (err) {
+      setError(err.response?.data?.msg || "Signup failed");
+      return {
+        success: false,
+        error: err.response?.data,
+      };
+    }
+  }; // Verify email function
+  const verifyEmail = async (token) => {
+    setError(null);
+
+    try {
+      console.log(`Sending verification request for token: ${token}`);
+      const res = await axios.post(
+        `http://localhost:5000/api/auth/verify-email/${token}`
+      );
+
+      const { token: authToken, user } = res.data;
 
       // Store token and set auth header
-      localStorage.setItem("token", token);
-      axios.defaults.headers.common["x-auth-token"] = token;
+      localStorage.setItem("token", authToken);
+      axios.defaults.headers.common["x-auth-token"] = authToken;
 
       // Update state
       setUser(user);
 
-      return true;
+      console.log("Verification successful:", res.data);
+      return {
+        success: true,
+        data: res.data,
+      };
     } catch (err) {
-      setError(err.response?.data?.msg || "Signup failed");
-      return false;
+      // Detailed error logging
+      console.error(
+        "Email verification error:",
+        err.response?.data || err.message
+      );
+
+      const errorMsg = err.response?.data?.msg || "Email verification failed";
+      setError(errorMsg);
+
+      return {
+        success: false,
+        error: err.response?.data || { msg: errorMsg },
+      };
+    }
+  };
+
+  // Resend verification email function
+  const resendVerification = async (email) => {
+    setError(null);
+
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/auth/resend-verification",
+        {
+          email,
+        }
+      );
+
+      return {
+        success: true,
+        data: res.data,
+      };
+    } catch (err) {
+      setError(
+        err.response?.data?.msg || "Failed to resend verification email"
+      );
+      return {
+        success: false,
+        error: err.response?.data,
+      };
     }
   };
 
@@ -149,7 +221,6 @@ export function AuthProvider({ children }) {
       return false;
     }
   };
-
   const value = {
     user,
     loading,
@@ -161,6 +232,8 @@ export function AuthProvider({ children }) {
     resetPassword,
     forgotPassword,
     deleteAccount,
+    verifyEmail,
+    resendVerification,
     setError,
   };
 
