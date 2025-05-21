@@ -2,8 +2,6 @@ const nodemailer = require("nodemailer");
 
 // Create reusable transporter
 const createTransporter = () => {
-  console.log("Creating email transporter with Gmail");
-
   return nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -105,16 +103,11 @@ const sendPasswordResetEmail = async (email, token) => {
     html: htmlContent,
   }; // Send email
   try {
-    console.log("Attempting to send password reset email to:", email);
-
     const transporter = createTransporter();
-
     const info = await transporter.sendMail(mailOptions);
-    console.log("Password reset email sent:", info.messageId);
     return true;
   } catch (error) {
-    console.error("Error sending password reset email:", error);
-    console.error("Error stack:", error.stack);
+    console.error("Error sending password reset email");
     return false;
   }
 };
