@@ -10,6 +10,8 @@
   --transition: all 0.3s ease;
   --success-color: #0cbc87;
   --error-color: #d6293e;
+  --danger-color: #d6293e;
+  --danger-hover: #b61f32;
 }
 
 * {
@@ -90,6 +92,25 @@ button:hover {
 button:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.4);
+}
+
+/* Button with spinner styling */
+button .loading-spinner {
+  display: inline-flex;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+button .loading-spinner .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+button .loading-spinner-small .spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
 }
 
 /* Card container for forms */
@@ -173,6 +194,72 @@ button:focus {
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* Profile and Delete Account Styles */
+.profile-container {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  padding: 2rem;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.profile-header {
+  margin-bottom: 1.5rem;
+}
+
+.profile-info {
+  margin-bottom: 2rem;
+}
+
+.profile-container button {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.delete-account-btn {
+  background-color: var(--danger-color);
+  color: white;
+}
+
+.delete-account-btn:hover {
+  background-color: var(--danger-hover);
+}
+
+.delete-confirmation {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--danger-color);
+  border-radius: var(--border-radius);
+  background-color: rgba(214, 41, 62, 0.05);
+}
+
+.confirmation-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.confirm-delete-btn {
+  background-color: var(--danger-color);
+  flex: 1;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+  background-color: var(--danger-hover);
+}
+
+.cancel-btn {
+  background-color: #6c757d;
+  flex: 1;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background-color: #5a6268;
 }
 
 @media (prefers-color-scheme: dark) {

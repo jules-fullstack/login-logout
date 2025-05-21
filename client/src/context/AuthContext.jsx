@@ -127,6 +127,29 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Delete account function
+  const deleteAccount = async () => {
+    setError(null);
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return false;
+
+      axios.defaults.headers.common["x-auth-token"] = token;
+      await axios.delete("http://localhost:5000/api/auth/delete-account");
+
+      // Clear auth data
+      localStorage.removeItem("token");
+      delete axios.defaults.headers.common["x-auth-token"];
+      setUser(null);
+
+      return true;
+    } catch (err) {
+      setError(err.response?.data?.msg || "Failed to delete account");
+      return false;
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -137,6 +160,7 @@ export function AuthProvider({ children }) {
     signup,
     resetPassword,
     forgotPassword,
+    deleteAccount,
     setError,
   };
 
