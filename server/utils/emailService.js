@@ -391,6 +391,7 @@ const sendPasswordResetEmail = async (email, token) => {
     </body>
     </html>
   `;
+
   // Setup email options
   const mailOptions = {
     from: `"Password Reset" <${process.env.GMAIL_USER}>`,
@@ -408,8 +409,117 @@ const sendPasswordResetEmail = async (email, token) => {
   }
 };
 
+const sendOtpEmail = async (email, otp) => {
+  // HTML email template for OTP
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Your Login Verification Code</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          margin: 0;
+          padding: 0;
+          background-color: #f9f9f9;
+        }
+        .container {
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+        .header {
+          background-color: #3498db;
+          padding: 30px;
+          color: white;
+          text-align: center;
+          border-radius: 8px 8px 0 0;
+        }
+        .content {
+          background-color: white;
+          padding: 40px 30px;
+          border-radius: 0 0 8px 8px;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .code-container {
+          margin: 20px 0;
+          text-align: center;
+        }
+        .code {
+          font-size: 32px;
+          font-weight: bold;
+          letter-spacing: 8px;
+          color: #333;
+          padding: 15px 20px;
+          background-color: #f0f0f0;
+          border-radius: 6px;
+          display: inline-block;
+        }
+        .footer {
+          text-align: center;
+          margin-top: 30px;
+          padding-top: 20px;
+          border-top: 1px solid #eee;
+          color: #666;
+          font-size: 12px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Login Verification</h1>
+        </div>
+        <div class="content">
+          <p>Hello,</p>
+          <p>We've received a login attempt for your account. To complete the login process, please enter the following verification code:</p>
+          
+          <div class="code-container">
+            <div class="code">${otp}</div>
+          </div>
+          
+          <p>This code will expire in 10 minutes for security reasons.</p>
+          
+          <p>If you didn't try to log in, please secure your account by changing your password immediately.</p>
+          
+          <p>Best regards,<br>The Team</p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Setup email options
+  const mailOptions = {
+    from: `"Account Security" <${process.env.GMAIL_USER}>`,
+    to: email,
+    subject: "Your Login Verification Code",
+    html: htmlContent,
+  };
+
+  // Send email
+  try {
+    const transporter = createTransporter();
+    const info = await transporter.sendMail(mailOptions);
+    console.log("OTP email sent: %s", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("Error sending OTP email:", error);
+    return false;
+  }
+};
+
+
 module.exports = {
   sendPasswordResetEmail,
   sendWelcomeEmail,
   sendVerificationEmail,
+  sendOtpEmail
 };

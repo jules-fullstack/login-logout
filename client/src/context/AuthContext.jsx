@@ -6,6 +6,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pendingOtpVerification, setPendingOtpVerification] = useState(null);
 
   // Check if we have a token on initial load
   useEffect(() => {
@@ -45,6 +46,20 @@ export function AuthProvider({ children }) {
         password,
       });
 
+      // Check if OTP verification is required
+      if (res.data.requiresOtp) {
+        setPendingOtpVerification({
+          userId: res.data.userId,
+          email
+        });
+        return {
+          success: true,
+          requiresOtp: true,
+          userId: res.data.userId,
+          email
+        };
+      }
+
       const { token, user } = res.data;
 
       // Store token and set auth header
@@ -68,6 +83,59 @@ export function AuthProvider({ children }) {
 
       setError(err.response?.data?.msg || "Login failed");
       return false;
+    }
+  };
+
+  // OTP verification function
+  const verifyOtp = async (otp) => {
+    setError(null);
+
+    if (!pendingOtpVerification) {
+      setError("No pending verification");
+      return { success: false };
+    }
+
+    try {
+      const res = await axios.post("http://localhost:5000/api/auth/verify-otp", {
+        userId: pendingOtpVerification.userId,
+        otp
+      });
+
+      const { token, user } = res.data;
+
+      // Store token and set auth header
+      localStorage.setItem("token", token);
+      axios.defaults.headers.common["x-auth-token"] = token;
+
+      // Update state
+      setUser(user);
+      setPendingOtpVerification(null);
+
+      return { success: true };
+    } catch (err) {
+      setError(err.response?.data?.msg || "Verification failed");
+      return { success: false };
+    }
+  };
+
+  // Resend OTP function
+  const resendOtp = async () => {
+    setError(null);
+
+    if (!pendingOtpVerification) {
+      setError("No pending verification");
+      return { success: false };
+    }
+
+    try {
+      await axios.post("http://localhost:5000/api/auth/resend-otp", {
+        userId: pendingOtpVerification.userId
+      });
+
+      return { success: true };
+    } catch (err) {
+      setError(err.response?.data?.msg || "Failed to resend verification code");
+      return { success: false };
     }
   };
 
@@ -257,6 +325,7 @@ export function AuthProvider({ children }) {
     user,
     loading,
     error,
+    pendingOtpVerification,
     isAuthenticated: !!user,
     login,
     logout,
@@ -266,8 +335,10 @@ export function AuthProvider({ children }) {
     deleteAccount,
     verifyEmail,
     resendVerification,
+    verifyOtp,
+    resendOtp,
     setError,
   };
-
+  
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

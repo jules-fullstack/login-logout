@@ -311,6 +311,51 @@ button .loading-spinner-small .spinner {
   background-color: #5a6268;
 }
 
+.otp-input-container {
+  margin: 1.5rem 0;
+}
+
+.otp-input {
+  text-align: center;
+  letter-spacing: 4px;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.otp-timer {
+  text-align: center;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.otp-timer .expiring {
+  color: var(--danger-color);
+  font-weight: bold;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  width: auto;
+  display: inline;
+}
+
+.link-button:hover {
+  color: var(--primary-hover);
+  background: none;
+}
+
+.link-button:disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --text-color: #e1e1e1;

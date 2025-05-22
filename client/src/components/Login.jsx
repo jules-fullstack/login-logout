@@ -30,6 +30,7 @@ export default function Login() {
       setResendingVerification(false);
     }
   };
+  
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -39,10 +40,15 @@ export default function Login() {
     try {
       const result = await login(form.email, form.password);
 
-      if (result === true) {
-        // Successfully logged in
-        navigate("/");
-      } else if (result && result.pendingVerification) {
+      if (result.success) {
+        if (result.requiresOtp) {
+          // Redirect to OTP verification page
+          navigate("/verify-otp");
+        } else {
+          // Successfully logged in without OTP
+          navigate("/");
+        }
+      } else if (result.pendingVerification) {
         // Email verification required
         setPendingVerification(true);
         setVerificationEmail(result.email);
@@ -54,6 +60,7 @@ export default function Login() {
       setIsLoading(false);
     }
   };
+  
   return (
     <div className="auth-card">
       {pendingVerification ? (

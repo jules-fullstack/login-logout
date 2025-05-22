@@ -8,6 +8,7 @@ const {
   sendPasswordResetEmail,
   sendWelcomeEmail,
   sendVerificationEmail,
+  sendOtpEmail
 } = require("../utils/emailService");
 
 // POST /api/auth/signup
@@ -89,16 +90,140 @@ router.post("/login", async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
+    // Generate a 6-digit OTP code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Hash the OTP for storage
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp)
+      .digest("hex");
+    
+    // Set OTP and expiration (10 minutes)
+    user.otpCode = hashedOtp;
+    user.otpExpires = Date.now() + 600000; // 10 minutes
+    await user.save();
+
+    // Send OTP email
+    const emailSent = await sendOtpEmail(user.email, otp);
+    
+    if (!emailSent) {
+      user.otpCode = undefined;
+      user.otpExpires = undefined;
+      await user.save();
+      return res.status(500).json({ msg: "Failed to send verification code" });
+    }
+
+    // Return user ID for OTP verification step
+    res.json({
+      msg: "Verification code sent to your email",
+      requiresOtp: true,
+      userId: user._id
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).send("Server error");
+  }
+});
+
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(400).json({ msg: "Invalid verification attempt" });
+    }
+
+    // Verify OTP exists and hasn't expired
+    if (!user.otpCode || !user.otpExpires) {
+      return res.status(400).json({ msg: "Verification code has not been requested" });
+    }
+
+    if (user.otpExpires < Date.now()) {
+      // Clear expired OTP
+      user.otpCode = undefined;
+      user.otpExpires = undefined;
+      await user.save();
+      
+      return res.status(400).json({ msg: "Verification code has expired" });
+    }
+
+    // Hash the provided OTP to compare with stored hash
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp)
+      .digest("hex");
+
+    // Check if OTP matches
+    if (hashedOtp !== user.otpCode) {
+      return res.status(400).json({ msg: "Invalid verification code" });
+    }
+
+    // Clear the OTP after successful verification
+    user.otpCode = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    // Generate JWT token for authentication
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
+
+    // Return the token and user info
     res.json({
       token,
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Server error");
+    console.error("OTP verification error:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+// Add a route to resend OTP
+router.post("/resend-otp", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(400).json({ msg: "Invalid user" });
+    }
+
+    // Generate a new 6-digit OTP code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Hash the OTP for storage
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp)
+      .digest("hex");
+    
+    // Set OTP and expiration (10 minutes)
+    user.otpCode = hashedOtp;
+    user.otpExpires = Date.now() + 600000; // 10 minutes
+    await user.save();
+
+    // Send OTP email
+    const emailSent = await sendOtpEmail(user.email, otp);
+    
+    if (!emailSent) {
+      user.otpCode = undefined;
+      user.otpExpires = undefined;
+      await user.save();
+      return res.status(500).json({ msg: "Failed to send verification code" });
+    }
+
+    res.json({ 
+      msg: "Verification code resent successfully",
+      email: user.email
+    });
+  } catch (err) {
+    console.error("Resend OTP error:", err);
+    res.status(500).json({ msg: "Server error" });
   }
 });
 
