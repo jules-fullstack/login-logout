@@ -14,10 +14,7 @@ export default function ResetPassword() {
   const { token } = useParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // We could validate the token on component mount
-    // but for simplicity, we'll just check it when submitting
-  }, [token]);
+  useEffect(() => {}, [token]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,8 +24,20 @@ export default function ResetPassword() {
       return setError("Passwords do not match");
     }
 
-    if (password.length < 6) {
-      return setError("Password must be at least 6 characters");
+    // Updated password validation to match server schema
+    if (password.length < 8) {
+      return setError("Password must be at least 8 characters");
+    }
+
+    // Check for uppercase, lowercase, and number
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      return setError(
+        "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+      );
     }
 
     setIsSubmitting(true);
@@ -38,10 +47,6 @@ export default function ResetPassword() {
 
       if (result.success) {
         setMessage("Password has been reset successfully!");
-        // Now we'll automatically log the user in
-        // The resetPassword function should return the user data and token
-        
-        // Redirect to home page after showing success message
         setTimeout(() => {
           navigate("/");
         }, 2000);
@@ -52,7 +57,6 @@ export default function ResetPassword() {
       setIsSubmitting(false);
     }
   };
-
   if (!validToken) {
     return (
       <div className="auth-card">
@@ -100,6 +104,23 @@ export default function ResetPassword() {
             />
 
             {error && <div className="error-message">{error}</div>}
+            <div className="password-requirements">
+              <h4>Password must:</h4>
+              <ul>
+                <li className={password.length >= 8 ? "requirement-met" : ""}>
+                  Be at least 8 characters long
+                </li>
+                <li className={/[A-Z]/.test(password) ? "requirement-met" : ""}>
+                  Contain at least one uppercase letter
+                </li>
+                <li className={/[a-z]/.test(password) ? "requirement-met" : ""}>
+                  Contain at least one lowercase letter
+                </li>
+                <li className={/[0-9]/.test(password) ? "requirement-met" : ""}>
+                  Contain at least one number
+                </li>
+              </ul>
+            </div>
 
             <button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (

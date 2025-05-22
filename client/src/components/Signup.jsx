@@ -22,9 +22,24 @@ export default function Signup() {
       return setError("Passwords do not match");
     }
 
+    // Updated password validation to match server schema
     if (password.length < 8) {
       return setError("Password must be at least 8 characters");
     }
+
+    // Check for uppercase, lowercase, and number
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      return setError(
+        "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+      );
+    }
+
+    // Update form object to include password
+    form.password = password;
 
     setIsLoading(true);
 
@@ -32,7 +47,6 @@ export default function Signup() {
       const result = await signup(form.name, form.email, form.password);
 
       if (result.success) {
-        // Show verification pending screen
         setVerificationPending(true);
         setVerificationEmail(form.email);
       }
@@ -98,6 +112,7 @@ export default function Signup() {
               required
               disabled={isLoading}
             />
+
             <input
               name="confirmPassword"
               placeholder="Confirm Password"
@@ -107,6 +122,23 @@ export default function Signup() {
               disabled={isLoading}
             />
             {error && <div className="error-message">{error}</div>}
+            <div className="password-requirements">
+              <h4>Password must:</h4>
+              <ul>
+                <li className={password.length >= 8 ? "requirement-met" : ""}>
+                  Be at least 8 characters long
+                </li>
+                <li className={/[A-Z]/.test(password) ? "requirement-met" : ""}>
+                  Contain at least one uppercase letter
+                </li>
+                <li className={/[a-z]/.test(password) ? "requirement-met" : ""}>
+                  Contain at least one lowercase letter
+                </li>
+                <li className={/[0-9]/.test(password) ? "requirement-met" : ""}>
+                  Contain at least one number
+                </li>
+              </ul>
+            </div>
             <button type="submit" disabled={isLoading}>
               {isLoading ? (
                 <>

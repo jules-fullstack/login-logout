@@ -16,7 +16,6 @@ import OtpVerification from "./components/OtpVerification";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { useAuth } from "./context/authUtils";
 
-// Protected route component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
@@ -31,7 +30,6 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Public route that redirects if already authenticated
 const PublicRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
@@ -46,7 +44,6 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
-// OTP verification route that's only accessible with pending OTP
 const OtpRoute = ({ children }) => {
   const { pendingOtpVerification, loading, isAuthenticated } = useAuth();
 

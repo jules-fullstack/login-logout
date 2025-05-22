@@ -13,38 +13,31 @@ export default function VerifyEmail() {
   const navigate = useNavigate();
 
  useEffect(() => {
-  // Add a flag to track if we should make the verification request
   let shouldVerify = true;
   
-  // If already verified through login or page is refreshed after successful verification
   if (user) {
     setSuccess(true);
     setVerifying(false);
     shouldVerify = false;
     
-    // Redirect immediately if user is already set
     navigate("/");
     return;
   }
 
-  // Check if this token was already verified in this session
   const verificationId = localStorage.getItem("verificationId");
   if (verificationId === token) {
     setSuccess(true);
     setVerifying(false);
     shouldVerify = false;
     
-    // Add immediate redirect here too
     navigate("/");
     return;
   }
   
-  // Only attempt verification once per component mount
   if (verificationAttempted) {
     shouldVerify = false;
   }
 
-  // Create an AbortController for cleanup
   const controller = new AbortController();
   let isMounted = true;
 
@@ -61,32 +54,22 @@ export default function VerifyEmail() {
     
     try {
       setVerificationAttempted(true);
-      console.log("Starting verification with token:", token);
       
-      // Use the abort controller with the request
       const result = await verifyEmail(token);
-      console.log("Verification result:", result);
 
       if (!isMounted) return;
 
       if (result.success) {
-        // Store this token as verified to prevent repeated attempts
         localStorage.setItem("verificationId", token);
         setSuccess(true);
         
-        // Improve redirect handling
-        console.log("Scheduling redirect to home page...");
-        
-        // Set a shorter timeout (2 seconds is enough to see the message)
         setTimeout(() => {
           if (isMounted) {
-            console.log("Executing redirect now");
             navigate("/", { replace: true });
           }
         }, 2000);
       } else if (result.alreadyVerified) {
         setSuccess(true);
-        // Add redirect for already verified case too
         setTimeout(() => {
           if (isMounted) {
             navigate("/", { replace: true });
@@ -102,7 +85,6 @@ export default function VerifyEmail() {
       }
     } finally {
       if (isMounted) {
-        // Short delay to prevent flashing states
         setTimeout(() => {
           setVerifying(false);
         }, 800);
@@ -116,7 +98,7 @@ export default function VerifyEmail() {
   
   return () => {
     isMounted = false;
-    controller.abort(); // Cancel any in-flight requests when component unmounts
+    controller.abort();
   };
 }, [token, verifyEmail, navigate, user, verificationAttempted]);
 

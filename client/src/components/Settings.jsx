@@ -2,10 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/authUtils";
 import LoadingSpinner from "./LoadingSpinner";
-import axios from "axios";
 
 const Settings = () => {
-  // Get error from useAuth as well
   const {
     user,
     updateName,
@@ -17,7 +15,6 @@ const Settings = () => {
   } = useAuth();
   const navigate = useNavigate();
 
-  // Name update state
   const [name, setName] = useState(user?.name || "");
   const [nameUpdating, setNameUpdating] = useState(false);
   const [nameSuccess, setNameSuccess] = useState(false);
@@ -25,7 +22,6 @@ const Settings = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
-  // Password update state
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -35,23 +31,20 @@ const Settings = () => {
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
-  // Sync with auth error
   useEffect(() => {
     if (authError) {
       if (nameUpdating) {
         setNameError(authError);
         setNameUpdating(false);
       } else if (passwordUpdating) {
-        // Check specifically for "incorrect password" error
         if (authError.includes("incorrect")) {
           setPasswordError("Current password is incorrect");
 
-          // Add visual feedback by adding error class to the current password field
           setTimeout(() => {
             const inputElement = document.getElementById("currentPassword");
             if (inputElement) {
               inputElement.classList.add("input-error");
-              inputElement.focus(); // Focus on the field with the error
+              inputElement.focus();
             }
           }, 0);
         } else {
@@ -62,23 +55,19 @@ const Settings = () => {
     }
   }, [authError, nameUpdating, passwordUpdating]);
 
-  // Clear auth error when component unmounts
   useEffect(() => {
     return () => {
       if (setError) setError(null);
     };
   }, [setError]);
 
-  // Handle name form input
   const handleNameChange = (e) => {
     setName(e.target.value);
     setNameSuccess(false);
     setNameError("");
   };
 
-  // Handle password form input
   const handlePasswordChange = (e) => {
-    // Remove error class when user starts typing in the field
     if (e.target.id === "currentPassword") {
       e.target.classList.remove("input-error");
     }
@@ -89,7 +78,6 @@ const Settings = () => {
     });
     setPasswordSuccess(false);
 
-    // Clear error message when user starts typing
     if (
       passwordError &&
       passwordError.includes("incorrect") &&
@@ -101,7 +89,6 @@ const Settings = () => {
     }
   };
 
-  // Submit name update
   const handleNameSubmit = async (e) => {
     e.preventDefault();
 
@@ -124,13 +111,11 @@ const Settings = () => {
     }
   };
 
-  // Submit password update
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
 
     const { currentPassword, newPassword, confirmPassword } = passwordForm;
 
-    // Basic validation
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPasswordError("All fields are required");
       return;
@@ -141,8 +126,21 @@ const Settings = () => {
       return;
     }
 
+    // Updated password validation to match server schema
     if (newPassword.length < 8) {
       setPasswordError("Password must be at least 8 characters");
+      return;
+    }
+
+    // Check for uppercase, lowercase, and number
+    const hasUppercase = /[A-Z]/.test(newPassword);
+    const hasLowercase = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      setPasswordError(
+        "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+      );
       return;
     }
 
@@ -155,46 +153,21 @@ const Settings = () => {
     setPasswordError("");
 
     try {
-      // First, explicitly validate the current password
-      const validateRes = await axios.post(
-        "http://localhost:5000/api/auth/validate-password",
-        { password: currentPassword },
-        {
-          headers: {
-            "x-auth-token": localStorage.getItem("token"),
-          },
-        }
-      );
-
-      // If validation passed, update the password
-      if (validateRes.data.valid) {
-        const success = await updatePassword(currentPassword, newPassword);
-        if (success) {
-          setPasswordSuccess(true);
-          setPasswordForm({
-            currentPassword: "",
-            newPassword: "",
-            confirmPassword: "",
-          });
-        }
-      } else {
-        // Password validation failed
-        setPasswordError("Current password is incorrect");
-
-        // Add visual feedback
-        const inputElement = document.getElementById("currentPassword");
-        if (inputElement) {
-          inputElement.classList.add("input-error");
-          inputElement.focus();
-        }
+      // Update API call to use the authAPI
+      const success = await updatePassword(currentPassword, newPassword);
+      if (success) {
+        setPasswordSuccess(true);
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
       }
     } catch (err) {
-      // Handle API errors
       if (
         err.response?.status === 400 &&
         err.response?.data?.msg.includes("incorrect")
       ) {
-        // Add visual feedback
         const inputElement = document.getElementById("currentPassword");
         if (inputElement) {
           inputElement.classList.add("input-error");
@@ -226,7 +199,6 @@ const Settings = () => {
     }
   };
 
-  // Loading state
   if (!user) return <LoadingSpinner size="large" />;
 
   return (
@@ -239,7 +211,6 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Update Name Section */}
       <div className="settings-section">
         <h2>Update Your Name</h2>
         <form onSubmit={handleNameSubmit} className="settings-form">
@@ -277,7 +248,6 @@ const Settings = () => {
         </form>
       </div>
 
-      {/* Update Password Section */}
       <div className="settings-section">
         <h2>Change Your Password</h2>
         <form onSubmit={handlePasswordSubmit} className="settings-form">

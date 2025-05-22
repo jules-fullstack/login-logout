@@ -5,7 +5,7 @@ import LoadingSpinner from "./LoadingSpinner";
 
 export default function OtpVerification() {
   const [otp, setOtp] = useState("");
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(600);
   const [isLoading, setIsLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
@@ -14,13 +14,11 @@ export default function OtpVerification() {
   const timerRef = useRef(null);
 
   useEffect(() => {
-    // If there's no pending OTP verification, redirect to login
     if (!pendingOtpVerification) {
       navigate("/login");
       return;
     }
 
-    // Set up countdown timer
     timerRef.current = setInterval(() => {
       setTimeLeft(prevTime => {
         if (prevTime <= 1) {
@@ -50,9 +48,8 @@ export default function OtpVerification() {
     
     if (result.success) {
       setResendSuccess(true);
-      setTimeLeft(600); // Reset timer to 10 minutes
+      setTimeLeft(600);
       
-      // Restart the timer
       clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setTimeLeft(prevTime => {
@@ -82,7 +79,6 @@ export default function OtpVerification() {
   };
 
   const handleChange = (e) => {
-    // Only allow numbers
     const value = e.target.value.replace(/[^0-9]/g, '');
     if (value.length <= 6) {
       setOtp(value);
@@ -135,7 +131,7 @@ export default function OtpVerification() {
           Didn't receive the code?{" "}
           <button 
             onClick={handleResendOtp} 
-            disabled={resendLoading || timeLeft > 540} // Allow resend after 1 minute
+            disabled={resendLoading || timeLeft > 540}
             className="link-button"
           >
             {resendLoading ? (

@@ -42,14 +42,11 @@ export default function Login() {
 
       if (result.success) {
         if (result.requiresOtp) {
-          // Redirect to OTP verification page
           navigate("/verify-otp");
         } else {
-          // Successfully logged in without OTP
           navigate("/");
         }
       } else if (result.pendingVerification) {
-        // Email verification required
         setPendingVerification(true);
         setVerificationEmail(result.email);
       }
