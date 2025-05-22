@@ -1,14 +1,14 @@
 # Dependencies
-node_modules/
+**/node_modules/
 /.pnp
 .pnp.js
 
 # Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
 
 # Logs
 logs
@@ -20,16 +20,16 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Build files
-dist
-dist-ssr
-build
+**/dist/
+**/dist-ssr/
+**/build/
 *.local
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
+**/.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
@@ -37,5 +37,18 @@ build
 *.sw?
 
 # Testing
-coverage/
-.nyc_output/
+**/coverage/
+**/.nyc_output/
+
+# Client specific ignores
+client/public/config.js
+
+# Server specific ignores
+**/uploads/
+**/tmp/
+
+# Backups and temporary files
+**/*.bak
+**/*.tmp
+**/*.temp
+*~
