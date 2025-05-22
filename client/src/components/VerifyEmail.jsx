@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/authUtils";
 import LoadingSpinner from "./LoadingSpinner";
@@ -8,52 +8,57 @@ export default function VerifyEmail() {
   const [verifying, setVerifying] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [verificationAttempted, setVerificationAttempted] = useState(false);
+  const verificationAttemptedRef = useRef(false);
+  const navigationAttemptedRef = useRef(false);
   const { verifyEmail, user } = useAuth();
   const navigate = useNavigate();
 
+  // Handle redirection to home page
   useEffect(() => {
-    let shouldVerify = true;
+    // Only execute this effect when success becomes true
+    if (success && !navigationAttemptedRef.current) {
+      navigationAttemptedRef.current = true;
+      const timer = setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 2000);
 
+      return () => clearTimeout(timer);
+    }
+  }, [success, navigate]);
+
+  // Main verification effect
+  useEffect(() => {
+    if (verificationAttemptedRef.current) return;
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    // If user is already logged in, show success and end
     if (user) {
       setSuccess(true);
       setVerifying(false);
-      shouldVerify = false;
-
-      navigate("/");
       return;
     }
 
+    // Check if we've already verified this token before
     const verificationId = localStorage.getItem("verificationId");
     if (verificationId === token) {
       setSuccess(true);
       setVerifying(false);
-      shouldVerify = false;
-
-      navigate("/");
       return;
     }
 
-    if (verificationAttempted) {
-      shouldVerify = false;
-    }
-
-    const controller = new AbortController();
-    let isMounted = true;
-
     const doVerify = async () => {
-      if (!token || !shouldVerify) {
+      if (!token) {
         if (isMounted) {
           setVerifying(false);
-          if (!token) {
-            setError("Invalid verification link");
-          }
+          setError("Invalid verification link");
         }
         return;
       }
 
       try {
-        setVerificationAttempted(true);
+        verificationAttemptedRef.current = true;
 
         const result = await verifyEmail(token);
 
@@ -62,55 +67,32 @@ export default function VerifyEmail() {
         if (result.success) {
           localStorage.setItem("verificationId", token);
           setSuccess(true);
-
-          setTimeout(() => {
-            if (isMounted) {
-              navigate("/", { replace: true });
-            }
-          }, 2000);
-        } else if (result.alreadyVerified) {
-          setSuccess(true);
-          setTimeout(() => {
-            if (isMounted) {
-              navigate("/", { replace: true });
-            }
-          }, 2000);
+          setVerifying(false);
         } else {
-          // Handle case where token has already been used
-          if (result.error?.msg?.includes("already been used")) {
-            setError("This link has already been used. Please try logging in.");
-          } else {
-            setError(result.error?.msg || "Verification failed");
-          }
+          setError(result.error?.msg || "Verification failed");
+          setVerifying(false);
         }
       } catch (err) {
         console.error("Verification error:", err);
         if (isMounted) {
           setError(err.message || "An error occurred during verification");
-        }
-      } finally {
-        if (isMounted) {
-          setTimeout(() => {
-            setVerifying(false);
-          }, 800);
+          setVerifying(false);
         }
       }
     };
 
-    if (shouldVerify) {
-      doVerify();
-    }
+    doVerify();
 
     return () => {
       isMounted = false;
       controller.abort();
     };
-  }, [token, verifyEmail, navigate, user, verificationAttempted]);
+  }, [token, verifyEmail, user]);
 
+  // Render the component
   return (
     <div className="auth-card">
       <h2>Email Verification</h2>
-
       {verifying ? (
         <div className="verifying">
           <LoadingSpinner />

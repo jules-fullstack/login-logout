@@ -97,7 +97,7 @@ const sendVerificationEmail = async (name, email, token) => {
           <p>Best regards,<br>The Team</p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Auth Website. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -236,25 +236,7 @@ const sendWelcomeEmail = async (name, email) => {
             <div style="font-size: 60px; color: #3498db;">✨</div>
           </div>
           
-          <p>Your account has been successfully created and is ready to use. Here's what you can do next:</p>
-          
-          <div class="features">
-            <div class="feature">
-              <div class="feature-icon">👤</div>
-              <h3>Complete Profile</h3>
-              <p>Add more information to your profile</p>
-            </div>
-            <div class="feature">
-              <div class="feature-icon">🔐</div>
-              <h3>Secure Account</h3>
-              <p>Set up additional security</p>
-            </div>
-            <div class="feature">
-              <div class="feature-icon">🚀</div>
-              <h3>Explore Features</h3>
-              <p>Discover what you can do</p>
-            </div>
-          </div>
+          <p>Your account has been successfully created and is ready to use.</p>
           
           <div style="text-align: center;">
             <a href="${loginUrl}" class="button">Get Started</a>
@@ -270,8 +252,7 @@ const sendWelcomeEmail = async (name, email) => {
               <a href="#">Twitter</a>
               <a href="#">Instagram</a>
             </div>
-            <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
-            <p>123 Example Street, City, Country</p>
+            <p>&copy; ${new Date().getFullYear()} Auth Website. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -472,7 +453,7 @@ const sendOtpEmail = async (email, otp) => {
           <p>Best regards,<br>The Team</p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Auth Website. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -496,10 +477,9 @@ const sendOtpEmail = async (email, otp) => {
   }
 };
 
-
 module.exports = {
   sendPasswordResetEmail,
   sendWelcomeEmail,
   sendVerificationEmail,
-  sendOtpEmail
+  sendOtpEmail,
 };

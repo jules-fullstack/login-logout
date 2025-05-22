@@ -186,6 +186,7 @@ export function AuthProvider({ children }) {
       return {
         success: true,
         data: res.data,
+        alreadyVerified: res.data.alreadyVerified || false,
       };
     } catch (err) {
       if (

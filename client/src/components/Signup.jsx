@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authUtils";
 import LoadingSpinner from "./LoadingSpinner";
@@ -10,21 +10,27 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState("");
-  const { signup, error, setError } = useAuth();
+  const [localError, setLocalError] = useState("");
+  const { signup, setError } = useAuth();
+
+  useEffect(() => {
+    setError("");
+  }, [setError]);
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setLocalError("");
     setError("");
 
     if (password !== confirmPassword) {
-      return setError("Passwords do not match");
+      return setLocalError("Passwords do not match");
     }
 
     // Updated password validation to match server schema
     if (password.length < 8) {
-      return setError("Password must be at least 8 characters");
+      return setLocalError("Password must be at least 8 characters");
     }
 
     // Check for uppercase, lowercase, and number
@@ -33,7 +39,7 @@ export default function Signup() {
     const hasNumber = /[0-9]/.test(password);
 
     if (!hasUppercase || !hasLowercase || !hasNumber) {
-      return setError(
+      return setLocalError(
         "Password must contain at least one uppercase letter, one lowercase letter, and one number"
       );
     }
@@ -121,7 +127,7 @@ export default function Signup() {
               required
               disabled={isLoading}
             />
-            {error && <div className="error-message">{error}</div>}
+            {localError && <div className="error-message">{localError}</div>}
             <div className="password-requirements">
               <h4>Password must:</h4>
               <ul>

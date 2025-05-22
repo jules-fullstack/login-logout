@@ -20,6 +20,60 @@ const Joi = require("joi");
 const validationSchemas = require("../utils/validationSchemas");
 const validateRequest = require("../middleware/validateRequest");
 
+class CustomMemoryStore {
+  constructor() {
+    this.hits = new Map();
+  }
+
+  init() {
+    return Promise.resolve();
+  }
+
+  // Get hits for a key
+  get(key) {
+    return Promise.resolve({
+      totalHits: this.hits.get(key) || 0,
+      resetTime: Date.now() + 60 * 1000, // This can be any time in the future
+    });
+  }
+
+  // Increment key hit count
+  increment(key) {
+    const current = this.hits.get(key) || 0;
+    this.hits.set(key, current + 1);
+    return Promise.resolve({
+      totalHits: current + 1, // Include totalHits in the response
+    });
+  }
+
+  // Decrement is optional but good to have
+  decrement(key) {
+    const current = this.hits.get(key) || 0;
+    if (current > 0) {
+      this.hits.set(key, current - 1);
+    }
+    return Promise.resolve({
+      totalHits: Math.max(0, current - 1), // Return updated hits
+    });
+  }
+
+  // Reset key hit count
+  resetKey(key) {
+    this.hits.delete(key);
+    return Promise.resolve();
+  }
+
+  // Reset all keys
+  resetAll() {
+    this.hits.clear();
+    return Promise.resolve();
+  }
+}
+
+// Create store instances
+const authLimitStore = new CustomMemoryStore();
+const otpLimitStore = new CustomMemoryStore();
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -40,6 +94,11 @@ const otpLimiter = rateLimit({
   },
 });
 
+const resetUserRateLimits = (email, userId) => {
+  if (email) authLimitStore.resetKey(email);
+  if (userId) otpLimitStore.resetKey(userId);
+};
+
 router.post(
   "/signup",
   validateRequest(validationSchemas.signup),
@@ -53,50 +112,84 @@ router.post(
       const salt = await bcrypt.genSalt(12);
       const hash = await bcrypt.hash(password, salt);
 
-      const verificationToken = crypto.randomBytes(32).toString("hex");
-      const hashedToken = crypto
-        .createHash("sha256")
-        .update(verificationToken)
-        .digest("hex");
-
+      // Create user first
       const user = new User({
         name,
         email,
         password: hash,
         isVerified: false,
-        verificationToken: hashedToken,
-        verificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
         refreshTokens: [],
       });
+
       await user.save();
 
-      try {
-        const emailSent = await sendVerificationEmail(
-          user.name,
-          user.email,
-          verificationToken
-        );
+      // Generate verification token - use more entropy to avoid collisions
+      const verificationToken = crypto.randomBytes(48).toString("hex");
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(verificationToken)
+        .digest("hex");
 
-        if (emailSent) {
-          return res.json({
-            msg: "Registration pending. Verification email sent.",
-            email: user.email,
-          });
-        } else {
-          return res
-            .status(500)
-            .json({ msg: "Failed to send verification email" });
-        }
-      } catch (emailError) {
-        console.error("Failed to send verification email:", emailError);
-        return res.status(500).json({
-          msg: "Failed to send verification email",
-          error: emailError.message,
+      // Delete any existing tokens for this user
+      await Token.deleteMany({ userId: user._id, type: "emailVerification" });
+
+      // Create new token with unique index
+      try {
+        const token = new Token({
+          userId: user._id,
+          token: hashedToken,
+          type: "emailVerification",
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
         });
+
+        await token.save();
+      } catch (tokenError) {
+        console.error("Token creation error:", tokenError);
+        // If there's a duplicate token (extremely unlikely with proper entropy)
+        // Generate a new one with even more entropy
+        if (tokenError.code === 11000) {
+          const retryToken = crypto.randomBytes(64).toString("hex");
+          const hashedRetryToken = crypto
+            .createHash("sha256")
+            .update(retryToken)
+            .digest("hex");
+
+          const token = new Token({
+            userId: user._id,
+            token: hashedRetryToken,
+            type: "emailVerification",
+            expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          });
+
+          await token.save();
+
+          // Update the verification token to use
+          verificationToken = retryToken;
+        } else {
+          throw tokenError; // Re-throw if it's not a duplicate error
+        }
       }
+
+      // Send verification email
+      const emailSent = await sendVerificationEmail(
+        user.name,
+        user.email,
+        verificationToken
+      );
+
+      if (!emailSent) {
+        return res
+          .status(500)
+          .json({ msg: "Failed to send verification email" });
+      }
+
+      res.status(201).json({
+        success: true,
+        msg: "User created. Please verify your email to complete registration.",
+      });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ msg: "Server error", error: err.message });
+      console.error("Email verification error:", err);
+      res.status(500).json({ msg: "Server error" });
     }
   }
 );
@@ -315,18 +408,23 @@ router.post(
         });
       }
 
+      // Generate a random token
       const resetToken = crypto.randomBytes(32).toString("hex");
 
-      user.resetPasswordToken = crypto
+      // Hash the token for storage in the database
+      const hashedToken = crypto
         .createHash("sha256")
         .update(resetToken)
         .digest("hex");
 
-      user.resetPasswordExpires = Date.now() + 60 * 60 * 1000;
+      // Store the hashed token in the user document
+      user.resetPasswordToken = hashedToken;
+      user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour expiry
 
       await user.save();
 
       try {
+        // Send the UNHASHED token to the user (this is what's in the email link)
         const emailSent = await sendPasswordResetEmail(user.email, resetToken);
 
         if (emailSent) {
@@ -358,19 +456,25 @@ router.post(
     try {
       const { token, password } = req.body;
 
+      // Hash the reset token to match how it's stored in the database
+      const resetPasswordToken = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+
       // Check if token has been used before
-      const usedToken = await Token.findOne({ token, type: "reset" });
+      const usedToken = await Token.findOne({
+        token: resetPasswordToken,
+        type: "passwordReset",
+      });
+
       if (usedToken) {
         return res
           .status(400)
           .json({ msg: "This reset link has already been used" });
       }
 
-      const resetPasswordToken = crypto
-        .createHash("sha256")
-        .update(token)
-        .digest("hex");
-
+      // Find user with the hashed token
       const user = await User.findOne({
         resetPasswordToken,
         resetPasswordExpires: { $gt: Date.now() },
@@ -380,11 +484,12 @@ router.post(
         return res.status(400).json({ msg: "Invalid or expired reset token" });
       }
 
-      // Save this token as used before proceeding
+      // Save this token as used before proceeding (use hashed token)
       await new Token({
-        token,
-        type: "reset",
+        token: resetPasswordToken,
+        type: "passwordReset",
         userId: user._id,
+        expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
       }).save();
 
       const salt = await bcrypt.genSalt(12);
@@ -493,6 +598,8 @@ router.post(
 router.post("/verify-email/:token", async (req, res) => {
   try {
     const originalToken = req.params.token;
+    // IMPORTANT: Remove this flag entirely, we won't use it
+    // let welcomeEmailSent = false; // Flag to track if welcome email was sent
 
     if (
       !originalToken ||
@@ -504,17 +611,30 @@ router.post("/verify-email/:token", async (req, res) => {
       });
     }
 
-    // Check if token has been used before
-    const usedToken = await Token.findOne({
-      token: originalToken,
-      type: "verification",
-    });
-    if (usedToken) {
-      // If token used before, check if the user is the same
-      const user = await User.findById(usedToken.userId);
+    // Hash the token
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(originalToken)
+      .digest("hex");
 
-      if (user) {
-        // If user exists and token was already used, issue new login tokens
+    // First path: Check if token exists in Token collection
+    const tokenDoc = await Token.findOne({
+      token: hashedToken,
+      type: "emailVerification",
+    });
+
+    if (tokenDoc) {
+      const user = await User.findById(tokenDoc.userId);
+
+      if (!user) {
+        return res.status(400).json({
+          msg: "User not found for this verification token.",
+        });
+      }
+
+      // Handle already verified users
+      if (user.isVerified) {
+        // Generate authentication tokens for already verified users
         const accessToken = jwtHelpers.generateAccessToken(user._id);
         const refreshToken = jwtHelpers.generateRefreshToken(user._id);
 
@@ -546,25 +666,62 @@ router.post("/verify-email/:token", async (req, res) => {
         });
 
         return res.json({
-          msg: "Email already verified. You can now log in.",
+          msg: "Email already verified. You are now logged in.",
           alreadyVerified: true,
           user: { id: user._id, name: user.name, email: user.email },
         });
       }
 
-      return res.status(400).json({
-        msg: "This verification link has already been used. Please try logging in.",
-        alreadyVerified: true,
+      // Mark user as verified if not already
+      user.isVerified = true;
+      await user.save();
+
+      // Generate tokens for new verified user
+      const accessToken = jwtHelpers.generateAccessToken(user._id);
+      const refreshToken = jwtHelpers.generateRefreshToken(user._id);
+
+      user.refreshTokens = user.refreshTokens || [];
+      user.refreshTokens.push({
+        token: refreshToken,
+        createdAt: new Date(),
+      });
+
+      await user.save();
+
+      // Set cookies
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 1000,
+      });
+
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/auth/refresh-token",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      // **** KEEPING ONLY THIS WELCOME EMAIL CALL ****
+      // Send welcome email only if this is a first-time verification
+      try {
+        await sendWelcomeEmail(user.name, user.email);
+        // welcomeEmailSent = true; // Remove this line
+      } catch (emailError) {
+        console.error("Failed to send welcome email:", emailError);
+      }
+
+      return res.json({
+        msg: "Email verification successful!",
+        user: { id: user._id, name: user.name, email: user.email },
       });
     }
 
-    const verificationToken = crypto
-      .createHash("sha256")
-      .update(originalToken)
-      .digest("hex");
-
+    // Second path: Check for tokens stored directly in the User model (legacy path)
     const user = await User.findOne({
-      verificationToken,
+      verificationToken: hashedToken,
     });
 
     if (!user) {
@@ -662,11 +819,8 @@ router.post("/verify-email/:token", async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    try {
-      await sendWelcomeEmail(user.name, user.email);
-    } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError);
-    }
+    // **** COMPLETELY REMOVE THIS WELCOME EMAIL CALL ****
+    // Do not add any welcome email sending code here
 
     return res.json({
       msg: "Email verification successful!",
