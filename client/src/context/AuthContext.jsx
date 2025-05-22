@@ -350,54 +350,56 @@ export function AuthProvider({ children }) {
   };
 
   const updateName = async (newName) => {
-  setError(null);
+    setError(null);
 
-  try {
-    // Make the API request
-    const res = await axios.put(
-      "http://localhost:5000/api/auth/update-name",
-      { name: newName },
-      {
-        headers: {
-          "x-auth-token": localStorage.getItem("token"),
-        },
-      }
-    );
+    try {
+      // Make the API request
+      const res = await axios.put(
+        "http://localhost:5000/api/auth/update-name",
+        { name: newName },
+        {
+          headers: {
+            "x-auth-token": localStorage.getItem("token"),
+          },
+        }
+      );
 
-    // Use the response data from the server to update the user
-    setUser(res.data);
-    
-    return true;
-  } catch (err) {
-    const errorMsg = err.response?.data?.msg || "Failed to update name";
-    setError(errorMsg);
-    console.error("Name update error:", errorMsg);
-    return false;
-  }
-};
+      // Use the response data from the server to update the user
+      setUser(res.data);
 
-// Improve updatePassword function with better error handling
-const updatePassword = async (currentPassword, newPassword) => {
-  setError(null);
+      return true;
+    } catch (err) {
+      const errorMsg = err.response?.data?.msg || "Failed to update name";
+      setError(errorMsg);
+      console.error("Name update error:", errorMsg);
+      return false;
+    }
+  };
 
-  try {
-    await axios.put(
-      "http://localhost:5000/api/auth/update-password",
-      { currentPassword, newPassword },
-      {
-        headers: {
-          "x-auth-token": localStorage.getItem("token"),
-        },
-      }
-    );
-    return true;
-  } catch (err) {
-    const errorMsg = err.response?.data?.msg || "Failed to update password";
-    setError(errorMsg);
-    console.error("Password update error:", errorMsg);
-    return false;
-  }
-};
+  // Improve updatePassword function with better error handling
+  const updatePassword = async (currentPassword, newPassword) => {
+    setError(null);
+
+    try {
+      await axios.put(
+        "http://localhost:5000/api/auth/update-password",
+        { currentPassword, newPassword },
+        {
+          headers: {
+            "x-auth-token": localStorage.getItem("token"),
+          },
+        }
+      );
+      return true;
+    } catch (err) {
+      // Get the exact error message from the server
+      const errorMessage =
+        err.response?.data?.msg || "Failed to update password";
+      setError(errorMessage);
+      console.error("Password update error:", errorMessage);
+      return false;
+    }
+  };
 
   const value = {
     user,

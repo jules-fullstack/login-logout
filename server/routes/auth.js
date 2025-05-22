@@ -624,4 +624,33 @@ router.put("/update-password", authMiddleware, async (req, res) => {
   }
 });
 
+router.post("/validate-password", authMiddleware, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    // Check if password was provided
+    if (!password) {
+      return res.status(400).json({ msg: "Password is required", valid: false });
+    }
+
+    // Get user
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found", valid: false });
+    }
+
+    // Compare passwords
+    const isMatch = await bcrypt.compare(password, user.password);
+    
+    if (isMatch) {
+      return res.json({ msg: "Password is valid", valid: true });
+    } else {
+      return res.status(400).json({ msg: "Password is incorrect", valid: false });
+    }
+  } catch (err) {
+    console.error("Password validation error:", err);
+    res.status(500).json({ msg: "Server error", valid: false });
+  }
+});
+
 module.exports = router;

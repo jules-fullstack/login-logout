@@ -829,3 +829,51 @@ button .loading-spinner-small .spinner {
     margin: 5rem 1rem 1rem 1rem;
   }
 }
+
+.input-error {
+  border-color: var(--error-color) !important;
+  background-color: rgba(255, 107, 107, 0.05);
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Shake animation for errors */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+/* Add a helpful hint below the password field when there's an error */
+.password-hint {
+  display: none;
+  font-size: 0.85rem;
+  margin-top: -0.8rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--border-radius);
+  background-color: rgba(255, 209, 102, 0.15);
+  color: #B45309;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.input-error + .password-hint {
+  display: flex;
+}
+
+/* Modify error message for better visibility */
+.error-message {
+  padding: 1rem 1.2rem;
+  border-radius: var(--border-radius);
+  margin: 1rem 0;
+  font-weight: 600;
+  background-color: rgba(255, 107, 107, 0.1);
+  color: var(--error-color);
+  border: 2px solid var(--error-color);
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
