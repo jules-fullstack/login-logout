@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require('helmet');
 const securityHeaders = require('./middleware/securityHeaders');
+const { csrfProtection, csrfToken, skipCsrf } = require('./middleware/csrf');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -33,7 +34,7 @@ const corsOptions = {
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'x-auth-token']
+  allowedHeaders: ['Content-Type', 'x-auth-token', 'X-CSRF-Token']
 };
 
 app.use(cors(corsOptions));
@@ -70,6 +71,28 @@ app.use(helmet(helmetConfig));
 
 // Apply custom headers after Helmet
 app.use(securityHeaders);
+
+app.use(csrfToken());
+
+// Define routes that should skip CSRF protection
+app.use('/api/webhook', skipCsrf);
+app.use('/api/public', skipCsrf);
+
+// Apply CSRF protection to routes that need it
+const csrfMiddleware = csrfProtection();
+app.use('/api/auth/login', csrfMiddleware);
+app.use('/api/auth/signup', csrfMiddleware);
+app.use('/api/auth/logout', csrfMiddleware);
+app.use('/api/auth/reset-password', csrfMiddleware);
+app.use('/api/auth/update-password', csrfMiddleware);
+app.use('/api/auth/update-name', csrfMiddleware);
+app.use('/api/auth/delete-account', csrfMiddleware);
+
+// Add an endpoint to get a CSRF token
+app.get('/api/csrf-token', (req, res) => {
+  // The csrfToken middleware added the csrfToken() method to req
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 app.use("/api/auth", require("./routes/auth"));
 
