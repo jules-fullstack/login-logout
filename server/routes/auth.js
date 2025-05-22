@@ -301,36 +301,55 @@ router.post("/forgot-password", async (req, res) => {
 });
 
 // POST /api/auth/reset-password/:token
-router.post("/reset-password/:token", async (req, res) => {
+router.post("/reset-password", async (req, res) => {
   try {
-    // Get hashed token
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ msg: "Please provide all fields" });
+    }
+
+    // Hash token
     const resetPasswordToken = crypto
       .createHash("sha256")
-      .update(req.params.token)
+      .update(token)
       .digest("hex");
 
-    // Find user with matching token and valid expiration
+    // Find user with matching token and valid expiry
     const user = await User.findOne({
       resetPasswordToken,
       resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!user) {
-      return res.status(400).json({ msg: "Invalid or expired token" });
+      return res.status(400).json({ msg: "Invalid or expired reset token" });
     }
 
-    // Set new password
+    // Hash the new password
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(req.body.password, salt);
-
+    user.password = await bcrypt.hash(password, salt);
+    
     // Clear reset token fields
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
-
-    // Save updated user
+    
     await user.save();
 
-    res.json({ msg: "Password has been reset" });
+    // Generate JWT for auto-login
+    const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    // Return token and user data for auto-login
+    res.json({ 
+      msg: "Password reset successful", 
+      token: jwtToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
   } catch (err) {
     console.error("Reset password error:", err);
     res.status(500).json({ msg: "Server error" });

@@ -437,9 +437,9 @@ button .loading-spinner-small .spinner {
 }
 
 .confirm-delete-btn span {
+  font-size: 1rem;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   font-weight: 600;
 }
 

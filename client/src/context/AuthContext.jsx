@@ -295,21 +295,34 @@ export function AuthProvider({ children }) {
 
   // Reset password function
   const resetPassword = async (token, password) => {
-    setError(null);
-
-    try {
-      await axios.post(
-        `http://localhost:5000/api/auth/reset-password/${token}`,
-        {
-          password,
-        }
-      );
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.msg || "Password reset failed");
-      return false;
+  setError(null);
+  
+  try {
+    // First, reset the password
+    const res = await axios.post(
+      "http://localhost:5000/api/auth/reset-password",
+      { token, password }
+    );
+    
+    // If successful, automatically log the user in
+    if (res.data.token) {
+      // Save token to localStorage
+      localStorage.setItem("token", res.data.token);
+      
+      // Set the user in state
+      setUser(res.data.user);
+      
+      return { success: true };
     }
-  };
+    
+    return { success: true }; // For backward compatibility
+  } catch (err) {
+    const errorMessage = err.response?.data?.msg || "Failed to reset password";
+    setError(errorMessage);
+    console.error("Password reset error:", errorMessage);
+    return { success: false };
+  }
+};
 
   // Forgot password function
   const forgotPassword = async (email) => {

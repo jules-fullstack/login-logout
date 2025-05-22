@@ -34,14 +34,17 @@ export default function ResetPassword() {
     setIsSubmitting(true);
 
     try {
-      const success = await resetPassword(token, password);
+      const result = await resetPassword(token, password);
 
-      if (success) {
+      if (result.success) {
         setMessage("Password has been reset successfully!");
-        // Redirect to login after 3 seconds
+        // Now we'll automatically log the user in
+        // The resetPassword function should return the user data and token
+        
+        // Redirect to home page after showing success message
         setTimeout(() => {
-          navigate("/login");
-        }, 3000);
+          navigate("/");
+        }, 2000);
       } else {
         setValidToken(false);
       }
@@ -72,7 +75,7 @@ export default function ResetPassword() {
       {message ? (
         <div className="success-message">
           <p>{message}</p>
-          <p>Redirecting to login page...</p>
+          <p>Redirecting to your account...</p>
         </div>
       ) : (
         <>
