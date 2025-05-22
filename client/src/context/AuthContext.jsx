@@ -12,11 +12,25 @@ export function AuthProvider({ children }) {
     const checkAuth = async () => {
       try {
         setLoading(true);
-        const res = await authAPI.getUser();
-        setUser(res.data);
-      } catch (err) {
-        console.error("Authentication check failed:", err);
-        setUser(null);
+        // First check if refreshToken cookie exists before making requests
+        const cookies = document.cookie.split(";");
+        const hasRefreshToken = cookies.some((cookie) =>
+          cookie.trim().startsWith("refreshToken=")
+        );
+
+        // Only try to authenticate if there's a refresh token cookie
+        if (hasRefreshToken) {
+          try {
+            const res = await authAPI.getUser();
+            setUser(res.data);
+          } catch (err) {
+            // Silent failure is expected for unauthenticated users
+            setUser(null);
+          }
+        } else {
+          // Skip authentication attempts if no cookie
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -27,7 +41,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!user) return;
-    
+
     const refreshInterval = setInterval(async () => {
       try {
         await authAPI.refreshToken();
@@ -36,7 +50,7 @@ export function AuthProvider({ children }) {
         setUser(null);
       }
     }, 50 * 60 * 1000); // 50 minutes
-    
+
     return () => clearInterval(refreshInterval);
   }, [user]);
 
@@ -115,13 +129,13 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     setError(null);
-    
+
     try {
       await authAPI.logout();
     } catch (err) {
       console.error("Logout error:", err);
     }
-    
+
     setUser(null);
   };
 
@@ -224,15 +238,16 @@ export function AuthProvider({ children }) {
 
   const resetPassword = async (token, password) => {
     setError(null);
-    
+
     try {
       const res = await authAPI.resetPassword(token, password);
-      
+
       setUser(res.data.user);
-      
+
       return { success: true };
     } catch (err) {
-      const errorMessage = err.response?.data?.msg || "Failed to reset password";
+      const errorMessage =
+        err.response?.data?.msg || "Failed to reset password";
       setError(errorMessage);
       console.error("Password reset error:", errorMessage);
       return { success: false };
@@ -256,7 +271,7 @@ export function AuthProvider({ children }) {
 
     try {
       await authAPI.deleteAccount();
-      
+
       setUser(null);
 
       return true;

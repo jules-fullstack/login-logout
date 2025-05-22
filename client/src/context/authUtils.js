@@ -1,5 +1,13 @@
 import { createContext, useContext } from "react";
-const AuthContext = createContext();
+const AuthContext = createContext({
+  user: null,
+  loading: true,
+  error: null,
+  pendingOtpVerification: null,
+  isAuthenticated: false,
+  login: () => {},
+  logout: () => {},
+});
 
 export const useAuth = () => useContext(AuthContext);
 
