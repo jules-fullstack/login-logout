@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
+const mongoose = require('mongoose');
 const {
   sendPasswordResetEmail,
   sendWelcomeEmail,
@@ -549,6 +550,76 @@ router.delete("/delete-account", authMiddleware, async (req, res) => {
     res.json({ msg: "Account successfully deleted" });
   } catch (err) {
     console.error("Delete account error:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+router.put("/update-name", authMiddleware, async (req, res) => {
+  try {
+    console.log("Update name request received:", req.body);
+    const { name } = req.body;
+
+    // Simple validation
+    if (!name || name.trim() === "") {
+      console.log("Name validation failed");
+      return res.status(400).json({ msg: "Name is required" });
+    }
+
+    console.log("Updating name for user:", req.user.id);
+    // Update the user
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: { name: name.trim() } },
+      { new: true }
+    ).select("-password");
+
+    console.log("User updated successfully:", user);
+    res.json(user);
+  } catch (err) {
+    console.error("Update name error:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+// Add to the update-password route
+router.put("/update-password", authMiddleware, async (req, res) => {
+  try {
+    console.log("Update password request received");
+    const { currentPassword, newPassword } = req.body;
+
+    // Simple validation
+    if (!currentPassword || !newPassword) {
+      console.log("Password validation failed: missing fields");
+      return res.status(400).json({ msg: "All fields are required" });
+    }
+
+    if (newPassword.length < 8) {
+      console.log("Password validation failed: too short");
+      return res.status(400).json({ msg: "Password must be at least 8 characters" });
+    }
+
+    // Get user
+    console.log("Getting user for password update:", req.user.id);
+    const user = await User.findById(req.user.id);
+
+    // Check current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      console.log("Current password is incorrect");
+      return res.status(400).json({ msg: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    console.log("Hashing new password");
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    await user.save();
+    console.log("Password updated successfully");
+
+    res.json({ msg: "Password updated successfully" });
+  } catch (err) {
+    console.error("Update password error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 });

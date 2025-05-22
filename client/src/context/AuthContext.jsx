@@ -1,4 +1,4 @@
-import { useState, useEffect} from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import AuthContext from "./authUtils";
 
@@ -50,13 +50,13 @@ export function AuthProvider({ children }) {
       if (res.data.requiresOtp) {
         setPendingOtpVerification({
           userId: res.data.userId,
-          email
+          email,
         });
         return {
           success: true,
           requiresOtp: true,
           userId: res.data.userId,
-          email
+          email,
         };
       }
 
@@ -96,10 +96,13 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/verify-otp", {
-        userId: pendingOtpVerification.userId,
-        otp
-      });
+      const res = await axios.post(
+        "http://localhost:5000/api/auth/verify-otp",
+        {
+          userId: pendingOtpVerification.userId,
+          otp,
+        }
+      );
 
       const { token, user } = res.data;
 
@@ -129,7 +132,7 @@ export function AuthProvider({ children }) {
 
     try {
       await axios.post("http://localhost:5000/api/auth/resend-otp", {
-        userId: pendingOtpVerification.userId
+        userId: pendingOtpVerification.userId,
       });
 
       return { success: true };
@@ -173,85 +176,95 @@ export function AuthProvider({ children }) {
 
   // Verify email function
   const verifyEmail = async (token) => {
-  setError(null);
+    setError(null);
 
-  // Use a flag to prevent duplicate tokens from being processed
-  const processedTokens = JSON.parse(localStorage.getItem("processedVerificationTokens") || "[]");
-  if (processedTokens.includes(token)) {
-    console.log("Token already processed:", token);
-    return {
-      success: true,
-      alreadyVerified: true,
-      data: { msg: "Email already verified" },
-    };
-  }
-
-  try {
-    console.log(`Sending verification request for token: ${token}`);
-    const res = await axios.post(
-      `http://localhost:5000/api/auth/verify-email/${token}`
+    // Use a flag to prevent duplicate tokens from being processed
+    const processedTokens = JSON.parse(
+      localStorage.getItem("processedVerificationTokens") || "[]"
     );
-
-    console.log("Verification response:", res.data);
-
-    // Mark this token as processed to prevent duplicate requests
-    processedTokens.push(token);
-    localStorage.setItem("processedVerificationTokens", JSON.stringify(processedTokens));
-
-    if (res.data && res.data.token) {
-      const { token: authToken, user } = res.data;
-
-      // Store token and set auth header
-      localStorage.setItem("token", authToken);
-      axios.defaults.headers.common["x-auth-token"] = authToken;
-
-      // Update state
-      setUser(user);
-
-      console.log("User authenticated", user);
-      return {
-        success: true,
-        data: res.data,
-      };
-    } else if (res.data.alreadyVerified || (res.data.msg && res.data.msg.includes("already verified"))) {
+    if (processedTokens.includes(token)) {
+      console.log("Token already processed:", token);
       return {
         success: true,
         alreadyVerified: true,
-        data: res.data,
+        data: { msg: "Email already verified" },
       };
-    } else {
-      console.warn("Unexpected response format:", res.data);
+    }
+
+    try {
+      console.log(`Sending verification request for token: ${token}`);
+      const res = await axios.post(
+        `http://localhost:5000/api/auth/verify-email/${token}`
+      );
+
+      console.log("Verification response:", res.data);
+
+      // Mark this token as processed to prevent duplicate requests
+      processedTokens.push(token);
+      localStorage.setItem(
+        "processedVerificationTokens",
+        JSON.stringify(processedTokens)
+      );
+
+      if (res.data && res.data.token) {
+        const { token: authToken, user } = res.data;
+
+        // Store token and set auth header
+        localStorage.setItem("token", authToken);
+        axios.defaults.headers.common["x-auth-token"] = authToken;
+
+        // Update state
+        setUser(user);
+
+        console.log("User authenticated", user);
+        return {
+          success: true,
+          data: res.data,
+        };
+      } else if (
+        res.data.alreadyVerified ||
+        (res.data.msg && res.data.msg.includes("already verified"))
+      ) {
+        return {
+          success: true,
+          alreadyVerified: true,
+          data: res.data,
+        };
+      } else {
+        console.warn("Unexpected response format:", res.data);
+        return {
+          success: false,
+          error: { msg: "Invalid server response" },
+        };
+      }
+    } catch (err) {
+      if (
+        err.response?.data?.alreadyVerified ||
+        err.response?.data?.msg?.includes("already verified") ||
+        err.response?.data?.msg?.includes("already been used")
+      ) {
+        return {
+          success: true,
+          alreadyVerified: true,
+          data: err.response.data,
+        };
+      }
+
+      // Detailed error logging
+      console.error(
+        "Email verification error:",
+        err.response?.data || err.message
+      );
+
+      const errorMsg = err.response?.data?.msg || "Email verification failed";
+      setError(errorMsg);
+
       return {
         success: false,
-        error: { msg: "Invalid server response" },
+        error: err.response?.data || { msg: errorMsg },
       };
     }
-  } catch (err) {
-    if (err.response?.data?.alreadyVerified || 
-        err.response?.data?.msg?.includes("already verified") ||
-        err.response?.data?.msg?.includes("already been used")) {
-      return {
-        success: true,
-        alreadyVerified: true,
-        data: err.response.data,
-      };
-    }
-    
-    // Detailed error logging
-    console.error(
-      "Email verification error:",
-      err.response?.data || err.message
-    );
-
-    const errorMsg = err.response?.data?.msg || "Email verification failed";
-    setError(errorMsg);
-
-    return {
-      success: false,
-      error: err.response?.data || { msg: errorMsg },
-    };
-  }
-};
+  };
 
   // Resend verification email function
   const resendVerification = async (email) => {
@@ -336,6 +349,56 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateName = async (newName) => {
+  setError(null);
+
+  try {
+    // Make the API request
+    const res = await axios.put(
+      "http://localhost:5000/api/auth/update-name",
+      { name: newName },
+      {
+        headers: {
+          "x-auth-token": localStorage.getItem("token"),
+        },
+      }
+    );
+
+    // Use the response data from the server to update the user
+    setUser(res.data);
+    
+    return true;
+  } catch (err) {
+    const errorMsg = err.response?.data?.msg || "Failed to update name";
+    setError(errorMsg);
+    console.error("Name update error:", errorMsg);
+    return false;
+  }
+};
+
+// Improve updatePassword function with better error handling
+const updatePassword = async (currentPassword, newPassword) => {
+  setError(null);
+
+  try {
+    await axios.put(
+      "http://localhost:5000/api/auth/update-password",
+      { currentPassword, newPassword },
+      {
+        headers: {
+          "x-auth-token": localStorage.getItem("token"),
+        },
+      }
+    );
+    return true;
+  } catch (err) {
+    const errorMsg = err.response?.data?.msg || "Failed to update password";
+    setError(errorMsg);
+    console.error("Password update error:", errorMsg);
+    return false;
+  }
+};
+
   const value = {
     user,
     loading,
@@ -353,7 +416,9 @@ export function AuthProvider({ children }) {
     verifyOtp,
     resendOtp,
     setError,
+    updateName, // Add this
+    updatePassword,
   };
-  
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
