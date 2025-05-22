@@ -395,39 +395,66 @@ router.post("/verify-email/:token", async (req, res) => {
   try {
     console.log(`Verifying token: ${req.params.token}`);
 
+    // Store the original token for tracking
+    const originalToken = req.params.token;
+    
     // Get hashed token
     const verificationToken = crypto
       .createHash("sha256")
-      .update(req.params.token)
+      .update(originalToken)
       .digest("hex");
 
     console.log(`Hashed token: ${verificationToken}`);
     
+    // First, check if this token has already been used by checking for a verified user
+    // We'll use a special collection to track used tokens
+    const db = mongoose.connection.db;
+    const verifiedTokens = db.collection('verifiedTokens');
+    
+    const tokenRecord = await verifiedTokens.findOne({ originalToken });
+    
+    if (tokenRecord) {
+      console.log("Token was previously used successfully");
+      // Find the user that was verified with this token
+      const user = await User.findById(tokenRecord.userId);
+      
+      if (user) {
+        // Generate JWT token for automatic login
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+          expiresIn: "1h",
+        });
+        
+        return res.json({
+          msg: "Email already verified. You can now log in.",
+          alreadyVerified: true,
+          token,
+          user: { id: user._id, name: user.name, email: user.email },
+        });
+      }
+    }
+    
     // Find user with matching token
-    let user = await User.findOne({
+    const user = await User.findOne({
       verificationToken,
     });
 
     if (!user) {
       console.log("No user found with matching token");
       
-      // Since tokens are removed after verification, check if any user was verified with this token
-      // by looking for a recently verified user with verificationToken = undefined
-      
-      // Look for users who might have already verified with this token
-      const verifiedUsers = await User.find({
+      // Instead of showing an error, let's check if any recently verified users exist
+      // that might have used this token before
+      const recentlyVerifiedUsers = await User.find({
         isVerified: true,
         verificationToken: { $exists: false }
       }).sort({ _id: -1 }).limit(5);
       
-      // If we have recently verified users, suggest they might have already verified
-      if (verifiedUsers.length > 0) {
+      if (recentlyVerifiedUsers.length > 0) {
         return res.status(400).json({
           msg: "This verification link has already been used. Please try logging in.",
           alreadyVerified: true
         });
       }
-
+      
       return res.status(400).json({
         msg: "Invalid verification token. Please sign up again.",
       });
@@ -450,7 +477,7 @@ router.post("/verify-email/:token", async (req, res) => {
         token,
         user: { id: user._id, name: user.name, email: user.email },
       });
-    } 
+    }
     
     // Check if token is expired
     if (user.verificationExpires && user.verificationExpires < Date.now()) {
@@ -461,6 +488,19 @@ router.post("/verify-email/:token", async (req, res) => {
       });
     }
 
+    // Store the original token in our tracking collection for future reference
+    try {
+      await verifiedTokens.insertOne({
+        originalToken,
+        hashedToken: verificationToken,
+        userId: user._id,
+        verifiedAt: new Date()
+      });
+    } catch (err) {
+      console.log("Warning: Could not track verified token:", err.message);
+      // Continue even if this fails
+    }
+
     // Update user verification status
     user.isVerified = true;
     user.verificationToken = undefined;
@@ -469,7 +509,7 @@ router.post("/verify-email/:token", async (req, res) => {
 
     console.log(`User ${user.email} verified successfully`);
 
-    // Send welcome email after verification
+    // Send welcome email after verification - only once per user
     try {
       await sendWelcomeEmail(user.name, user.email);
       console.log(`Welcome email sent to ${user.email}`);

@@ -109,6 +109,12 @@ export default function App() {
   return (
     <AuthProvider>
       <Router>
+        <div className="decoration-bubbles">
+          <div className="bubble bubble-1"></div>
+          <div className="bubble bubble-2"></div>
+          <div className="bubble bubble-3"></div>
+          <div className="bubble bubble-4"></div>
+        </div>
         <AppRoutes />
       </Router>
     </AuthProvider>

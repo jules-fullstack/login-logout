@@ -173,70 +173,85 @@ export function AuthProvider({ children }) {
 
   // Verify email function
   const verifyEmail = async (token) => {
-    setError(null);
+  setError(null);
 
-    try {
-      console.log(`Sending verification request for token: ${token}`);
-      const res = await axios.post(
-        `http://localhost:5000/api/auth/verify-email/${token}`
-      );
+  // Use a flag to prevent duplicate tokens from being processed
+  const processedTokens = JSON.parse(localStorage.getItem("processedVerificationTokens") || "[]");
+  if (processedTokens.includes(token)) {
+    console.log("Token already processed:", token);
+    return {
+      success: true,
+      alreadyVerified: true,
+      data: { msg: "Email already verified" },
+    };
+  }
 
-      console.log("Verification response:", res.data);
+  try {
+    console.log(`Sending verification request for token: ${token}`);
+    const res = await axios.post(
+      `http://localhost:5000/api/auth/verify-email/${token}`
+    );
 
-      if (res.data && res.data.token) {
-        const { token: authToken, user } = res.data;
+    console.log("Verification response:", res.data);
 
-        // Store token and set auth header
-        localStorage.setItem("token", authToken);
-        axios.defaults.headers.common["x-auth-token"] = authToken;
+    // Mark this token as processed to prevent duplicate requests
+    processedTokens.push(token);
+    localStorage.setItem("processedVerificationTokens", JSON.stringify(processedTokens));
 
-        // Update state
-        setUser(user);
+    if (res.data && res.data.token) {
+      const { token: authToken, user } = res.data;
 
-        console.log("User authenticated", user);
-        return {
-          success: true,
-          data: res.data,
-        };
-      } else if (res.data.alreadyVerified || (res.data.msg && res.data.msg.includes("already verified"))) {
-        return {
-          success: true,
-          alreadyVerified: true,
-          data: res.data,
-        };
-      } else {
-        console.warn("Unexpected response format:", res.data);
-        return {
-          success: false,
-          error: { msg: "Invalid server response" },
-        };
-      }
-    } catch (err) {
-      if (err.response?.data?.alreadyVerified || 
-          err.response?.data?.msg?.includes("already verified") ||
-          err.response?.data?.msg?.includes("already been used")) {
-        return {
-          success: true,
-          alreadyVerified: true,
-          data: err.response.data,
-        };
-      }
-      
-      // Detailed error logging
-      console.error(
-        "Email verification error:",
-        err.response?.data || err.message
-      );
+      // Store token and set auth header
+      localStorage.setItem("token", authToken);
+      axios.defaults.headers.common["x-auth-token"] = authToken;
 
-      const errorMsg = err.response?.data?.msg || "Email verification failed";
-      setError(errorMsg);
+      // Update state
+      setUser(user);
 
+      console.log("User authenticated", user);
+      return {
+        success: true,
+        data: res.data,
+      };
+    } else if (res.data.alreadyVerified || (res.data.msg && res.data.msg.includes("already verified"))) {
+      return {
+        success: true,
+        alreadyVerified: true,
+        data: res.data,
+      };
+    } else {
+      console.warn("Unexpected response format:", res.data);
       return {
         success: false,
-        error: err.response?.data || { msg: errorMsg },
+        error: { msg: "Invalid server response" },
       };
     }
-  };
+  } catch (err) {
+    if (err.response?.data?.alreadyVerified || 
+        err.response?.data?.msg?.includes("already verified") ||
+        err.response?.data?.msg?.includes("already been used")) {
+      return {
+        success: true,
+        alreadyVerified: true,
+        data: err.response.data,
+      };
+    }
+    
+    // Detailed error logging
+    console.error(
+      "Email verification error:",
+      err.response?.data || err.message
+    );
+
+    const errorMsg = err.response?.data?.msg || "Email verification failed";
+    setError(errorMsg);
+
+    return {
+      success: false,
+      error: err.response?.data || { msg: errorMsg },
+    };
+  }
+};
 
   // Resend verification email function
   const resendVerification = async (email) => {

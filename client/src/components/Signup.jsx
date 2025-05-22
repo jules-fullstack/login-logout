@@ -5,6 +5,8 @@ import LoadingSpinner from "./LoadingSpinner";
 
 export default function Signup() {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState("");
@@ -15,6 +17,15 @@ export default function Signup() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (password !== confirmPassword) {
+      return setError("Passwords do not match");
+    }
+
+    if (password.length < 6) {
+      return setError("Password must be at least 6 characters");
+    }
+
     setIsLoading(true);
 
     try {
@@ -83,7 +94,15 @@ export default function Signup() {
               name="password"
               placeholder="Password"
               type="password"
-              onChange={onChange}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={isLoading}
+            />
+            <input
+              name="confirmPassword"
+              placeholder="Confirm Password"
+              type="password"
+              onChange={(e) => setConfirmPassword(e.target.value)}
               required
               disabled={isLoading}
             />

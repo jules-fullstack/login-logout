@@ -43,25 +43,41 @@ export default function Home() {
       <div className="profile-info">
         <p>Your email: {user.email}</p>
       </div>
-      <button onClick={handleLogout}>Log Out</button>
       
+      <button className="logout-btn" onClick={handleLogout}>
+        Log Out
+      </button>
+
       {!showConfirmation ? (
-        <button className="delete-account-btn" onClick={handleDeleteAccountClick}>
+        <button
+          className="delete-account-btn"
+          onClick={handleDeleteAccountClick}
+        >
           Delete Account
         </button>
       ) : (
         <div className="delete-confirmation">
-          <p>Are you sure you want to delete your account? This action cannot be undone.</p>
+          <p>
+            Are you sure you want to delete your account? This action cannot be
+            undone.
+          </p>
           <div className="confirmation-buttons">
-            <button 
-              className="confirm-delete-btn" 
+            <button
+              className="confirm-delete-btn"
               onClick={handleConfirmDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? <><LoadingSpinner size="small" /> Deleting...</> : "Yes, Delete My Account"}
+              {isDeleting ? (
+                <>
+                  <LoadingSpinner size="small" />
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                <span>Yes, Delete My Account</span>
+              )}
             </button>
-            <button 
-              className="cancel-btn" 
+            <button
+              className="cancel-btn"
               onClick={handleCancelDelete}
               disabled={isDeleting}
             >

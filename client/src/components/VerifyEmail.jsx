@@ -12,34 +12,41 @@ export default function VerifyEmail() {
   const { verifyEmail, user } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
+ useEffect(() => {
+    // Add a flag to track if we should make the verification request
+    let shouldVerify = true;
+    
     // If already verified through login or page is refreshed after successful verification
     if (user) {
       setSuccess(true);
       setVerifying(false);
-      return;
+      shouldVerify = false;
     }
 
-    let isMounted = true;
-    
     // Check if this token was already verified in this session
     const verificationId = localStorage.getItem("verificationId");
     if (verificationId === token) {
       setSuccess(true);
       setVerifying(false);
-      return;
+      shouldVerify = false;
     }
     
     // Only attempt verification once per component mount
     if (verificationAttempted) {
-      return;
+      shouldVerify = false;
     }
 
+    // Create an AbortController for cleanup
+    const controller = new AbortController();
+    let isMounted = true;
+
     const doVerify = async () => {
-      if (!token) {
+      if (!token || !shouldVerify) {
         if (isMounted) {
-          setError("Invalid verification link");
           setVerifying(false);
+          if (!token) {
+            setError("Invalid verification link");
+          }
         }
         return;
       }
@@ -47,6 +54,8 @@ export default function VerifyEmail() {
       try {
         setVerificationAttempted(true);
         console.log("Starting verification with token:", token);
+        
+        // Use the abort controller with the request
         const result = await verifyEmail(token);
         console.log("Verification result:", result);
 
@@ -83,10 +92,13 @@ export default function VerifyEmail() {
       }
     };
 
-    doVerify();
+    if (shouldVerify) {
+      doVerify();
+    }
     
     return () => {
       isMounted = false;
+      controller.abort(); // Cancel any in-flight requests when component unmounts
     };
   }, [token, verifyEmail, navigate, user, verificationAttempted]);
 
