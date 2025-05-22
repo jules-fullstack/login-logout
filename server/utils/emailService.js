@@ -1,24 +1,20 @@
 const nodemailer = require("nodemailer");
 
-// Create reusable transporter
 const createTransporter = () => {
   return nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD, // App password, not regular Gmail password
+      pass: process.env.GMAIL_APP_PASSWORD,
     },
-    debug: process.env.NODE_ENV !== "production", // Only enable debug in non-production
+    debug: process.env.NODE_ENV !== "production",
   });
 };
 
-// Send verification email
 const sendVerificationEmail = async (name, email, token) => {
-  // Default client URL if not set in environment
   const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
   const verifyUrl = `${clientUrl}/verify-email/${token}`;
 
-  // Create HTML email template
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -108,7 +104,6 @@ const sendVerificationEmail = async (name, email, token) => {
     </html>
   `;
 
-  // Setup email options
   const mailOptions = {
     from: `"Account Verification" <${process.env.GMAIL_USER}>`,
     to: email,
@@ -116,11 +111,9 @@ const sendVerificationEmail = async (name, email, token) => {
     html: htmlContent,
   };
 
-  // Send email
   try {
     const transporter = createTransporter();
     const info = await transporter.sendMail(mailOptions);
-    console.log("Verification email sent: %s", info.messageId);
     return true;
   } catch (error) {
     console.error("Error sending verification email:", error);
@@ -128,13 +121,11 @@ const sendVerificationEmail = async (name, email, token) => {
   }
 };
 
-// Send welcome email
 const sendWelcomeEmail = async (name, email) => {
   // Default client URL if not set in environment
   const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
   const loginUrl = `${clientUrl}/login`;
 
-  // Create HTML email template
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -288,7 +279,6 @@ const sendWelcomeEmail = async (name, email) => {
     </html>
   `;
 
-  // Setup email options
   const mailOptions = {
     from: `"Welcome" <${process.env.GMAIL_USER}>`,
     to: email,
@@ -296,11 +286,9 @@ const sendWelcomeEmail = async (name, email) => {
     html: htmlContent,
   };
 
-  // Send email
   try {
     const transporter = createTransporter();
     const info = await transporter.sendMail(mailOptions);
-    console.log("Welcome email sent: %s", info.messageId);
     return true;
   } catch (error) {
     console.error("Error sending welcome email:", error);
@@ -308,13 +296,10 @@ const sendWelcomeEmail = async (name, email) => {
   }
 };
 
-// Send password reset email
 const sendPasswordResetEmail = async (email, token) => {
-  // Default client URL if not set in environment
   const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
   const resetUrl = `${clientUrl}/reset-password/${token}`;
 
-  // Create HTML email template
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -392,13 +377,12 @@ const sendPasswordResetEmail = async (email, token) => {
     </html>
   `;
 
-  // Setup email options
   const mailOptions = {
     from: `"Password Reset" <${process.env.GMAIL_USER}>`,
     to: email,
     subject: "Reset Your Password",
     html: htmlContent,
-  }; // Send email
+  };
   try {
     const transporter = createTransporter();
     const info = await transporter.sendMail(mailOptions);
@@ -410,7 +394,6 @@ const sendPasswordResetEmail = async (email, token) => {
 };
 
 const sendOtpEmail = async (email, otp) => {
-  // HTML email template for OTP
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -496,7 +479,6 @@ const sendOtpEmail = async (email, otp) => {
     </html>
   `;
 
-  // Setup email options
   const mailOptions = {
     from: `"Account Security" <${process.env.GMAIL_USER}>`,
     to: email,
@@ -504,11 +486,9 @@ const sendOtpEmail = async (email, otp) => {
     html: htmlContent,
   };
 
-  // Send email
   try {
     const transporter = createTransporter();
     const info = await transporter.sendMail(mailOptions);
-    console.log("OTP email sent: %s", info.messageId);
     return true;
   } catch (error) {
     console.error("Error sending OTP email:", error);

@@ -17,6 +17,19 @@ const UserSchema = new mongoose.Schema({
   resetPasswordExpires: { type: Date },
   otpCode: { type: String },
   otpExpires: { type: Date },
+  refreshTokens: [
+    {
+      token: {
+        type: String,
+        required: true,
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now,
+        expires: "7d",
+      },
+    },
+  ],
 });
 
 module.exports = mongoose.model("User", UserSchema);
