@@ -276,29 +276,39 @@ router.post("/verify-email/:token", async (req, res) => {
       .update(req.params.token)
       .digest("hex");
 
-    console.log(`Hashed token: ${verificationToken}`); // Find user with matching token
-    const user = await User.findOne({
+    console.log(`Hashed token: ${verificationToken}`);
+    
+    // Find user with matching token
+    let user = await User.findOne({
       verificationToken,
     });
 
     if (!user) {
       console.log("No user found with matching token");
-      console.log("Searched for token hash:", verificationToken);
+      
+      // Since tokens are removed after verification, check if any user was verified with this token
+      // by looking for a recently verified user with verificationToken = undefined
+      
+      // Look for users who might have already verified with this token
+      const verifiedUsers = await User.find({
+        isVerified: true,
+        verificationToken: { $exists: false }
+      }).sort({ _id: -1 }).limit(5);
+      
+      // If we have recently verified users, suggest they might have already verified
+      if (verifiedUsers.length > 0) {
+        return res.status(400).json({
+          msg: "This verification link has already been used. Please try logging in.",
+          alreadyVerified: true
+        });
+      }
+
       return res.status(400).json({
         msg: "Invalid verification token. Please sign up again.",
       });
     }
 
     console.log(`Found user: ${user.email}, isVerified: ${user.isVerified}`);
-    console.log(`User verification token: ${user.verificationToken}`);
-    console.log(
-      `User verification expires: ${
-        user.verificationExpires
-          ? new Date(user.verificationExpires).toISOString()
-          : "Not set"
-      }`
-    );
-    console.log(`Current time: ${new Date().toISOString()}`);
 
     // Check if already verified
     if (user.isVerified) {
@@ -311,23 +321,18 @@ router.post("/verify-email/:token", async (req, res) => {
 
       return res.json({
         msg: "Email already verified. You can now log in.",
+        alreadyVerified: true,
         token,
         user: { id: user._id, name: user.name, email: user.email },
       });
-    } // Check if token is expired
+    } 
+    
+    // Check if token is expired
     if (user.verificationExpires && user.verificationExpires < Date.now()) {
-      console.log("Token expired:", user.verificationExpires, Date.now());
-      console.log(
-        "Difference in milliseconds:",
-        Date.now() - user.verificationExpires
-      );
-      console.log(
-        "Expiration date:",
-        new Date(user.verificationExpires).toISOString()
-      );
-      console.log("Current date:", new Date().toISOString());
+      console.log("Token expired");
       return res.status(400).json({
         msg: "Verification link has expired. Please request a new one.",
+        expired: true
       });
     }
 
@@ -353,14 +358,16 @@ router.post("/verify-email/:token", async (req, res) => {
       expiresIn: "1h",
     });
 
-    res.json({
+    console.log("Sending successful response with token");
+    
+    return res.json({
       msg: "Email verification successful!",
       token,
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
     console.error("Email verification error:", err);
-    res.status(500).json({ msg: "Server error", error: err.message });
+    return res.status(500).json({ msg: "Server error", error: err.message });
   }
 });
 

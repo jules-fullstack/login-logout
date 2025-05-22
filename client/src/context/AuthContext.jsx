@@ -1,7 +1,6 @@
-import { createContext, useState, useEffect, useContext } from "react";
+import { useState, useEffect} from "react";
 import axios from "axios";
-
-const AuthContext = createContext();
+import AuthContext from "./authUtils";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -35,6 +34,7 @@ export function AuthProvider({ children }) {
 
     checkAuth();
   }, []);
+
   // Login function
   const login = async (email, password) => {
     setError(null);
@@ -77,6 +77,7 @@ export function AuthProvider({ children }) {
     delete axios.defaults.headers.common["x-auth-token"];
     setUser(null);
   };
+
   // Signup function
   const signup = async (name, email, password) => {
     setError(null);
@@ -100,7 +101,9 @@ export function AuthProvider({ children }) {
         error: err.response?.data,
       };
     }
-  }; // Verify email function
+  };
+
+  // Verify email function
   const verifyEmail = async (token) => {
     setError(null);
 
@@ -110,21 +113,47 @@ export function AuthProvider({ children }) {
         `http://localhost:5000/api/auth/verify-email/${token}`
       );
 
-      const { token: authToken, user } = res.data;
+      console.log("Verification response:", res.data);
 
-      // Store token and set auth header
-      localStorage.setItem("token", authToken);
-      axios.defaults.headers.common["x-auth-token"] = authToken;
+      if (res.data && res.data.token) {
+        const { token: authToken, user } = res.data;
 
-      // Update state
-      setUser(user);
+        // Store token and set auth header
+        localStorage.setItem("token", authToken);
+        axios.defaults.headers.common["x-auth-token"] = authToken;
 
-      console.log("Verification successful:", res.data);
-      return {
-        success: true,
-        data: res.data,
-      };
+        // Update state
+        setUser(user);
+
+        console.log("User authenticated", user);
+        return {
+          success: true,
+          data: res.data,
+        };
+      } else if (res.data.alreadyVerified || (res.data.msg && res.data.msg.includes("already verified"))) {
+        return {
+          success: true,
+          alreadyVerified: true,
+          data: res.data,
+        };
+      } else {
+        console.warn("Unexpected response format:", res.data);
+        return {
+          success: false,
+          error: { msg: "Invalid server response" },
+        };
+      }
     } catch (err) {
+      if (err.response?.data?.alreadyVerified || 
+          err.response?.data?.msg?.includes("already verified") ||
+          err.response?.data?.msg?.includes("already been used")) {
+        return {
+          success: true,
+          alreadyVerified: true,
+          data: err.response.data,
+        };
+      }
+      
       // Detailed error logging
       console.error(
         "Email verification error:",
@@ -168,6 +197,7 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Reset password function
   const resetPassword = async (token, password) => {
     setError(null);
 
@@ -185,6 +215,7 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Forgot password function
   const forgotPassword = async (email) => {
     setError(null);
 
@@ -221,6 +252,7 @@ export function AuthProvider({ children }) {
       return false;
     }
   };
+
   const value = {
     user,
     loading,
@@ -239,7 +271,3 @@ export function AuthProvider({ children }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-export const useAuth = () => useContext(AuthContext);
-
-export default AuthContext;

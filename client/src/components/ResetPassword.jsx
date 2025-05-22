@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useAuth } from "../context/authUtils";
 import LoadingSpinner from "./LoadingSpinner";
 
 export default function ResetPassword() {

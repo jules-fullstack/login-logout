@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useAuth } from "../context/authUtils";
 import LoadingSpinner from "./LoadingSpinner";
 
 export default function VerifyEmail() {
@@ -8,12 +8,33 @@ export default function VerifyEmail() {
   const [verifying, setVerifying] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const { verifyEmail } = useAuth();
+  const [verificationAttempted, setVerificationAttempted] = useState(false);
+  const { verifyEmail, user } = useAuth();
   const navigate = useNavigate();
-  
+
   useEffect(() => {
+    // If already verified through login or page is refreshed after successful verification
+    if (user) {
+      setSuccess(true);
+      setVerifying(false);
+      return;
+    }
+
     let isMounted = true;
     
+    // Check if this token was already verified in this session
+    const verificationId = localStorage.getItem("verificationId");
+    if (verificationId === token) {
+      setSuccess(true);
+      setVerifying(false);
+      return;
+    }
+    
+    // Only attempt verification once per component mount
+    if (verificationAttempted) {
+      return;
+    }
+
     const doVerify = async () => {
       if (!token) {
         if (isMounted) {
@@ -21,22 +42,31 @@ export default function VerifyEmail() {
           setVerifying(false);
         }
         return;
-      }      try {
+      }
+      
+      try {
+        setVerificationAttempted(true);
         console.log("Starting verification with token:", token);
         const result = await verifyEmail(token);
         console.log("Verification result:", result);
 
-        if (isMounted) {
-          if (result.success) {
-            setSuccess(true);
-            // Auto navigate to home after successful verification
-            setTimeout(() => {
+        if (!isMounted) return;
+
+        if (result.success) {
+          // Store this token as verified to prevent repeated attempts
+          localStorage.setItem("verificationId", token);
+          setSuccess(true);
+          
+          // Auto navigate to home after successful verification
+          setTimeout(() => {
+            if (isMounted) {
               navigate("/");
-            }, 3000);
-          } else {
-            console.log("Verification failed with error:", result.error);
-            setError(result.error?.msg || "Verification failed");
-          }
+            }
+          }, 3000);
+        } else if (result.alreadyVerified) {
+          setSuccess(true);
+        } else {
+          setError(result.error?.msg || "Verification failed");
         }
       } catch (err) {
         console.error("Verification error:", err);
@@ -44,11 +74,11 @@ export default function VerifyEmail() {
           setError(err.message || "An error occurred during verification");
         }
       } finally {
-        // Add a small delay before showing the result to prevent flashing error messages
         if (isMounted) {
+          // Short delay to prevent flashing states
           setTimeout(() => {
             setVerifying(false);
-          }, 1000);
+          }, 800);
         }
       }
     };
@@ -58,7 +88,8 @@ export default function VerifyEmail() {
     return () => {
       isMounted = false;
     };
-  }, [token, verifyEmail, navigate]);
+  }, [token, verifyEmail, navigate, user, verificationAttempted]);
+
   return (
     <div className="auth-card">
       <h2>Email Verification</h2>
@@ -89,7 +120,9 @@ export default function VerifyEmail() {
                 You can request a new verification link from the login page.
               </p>
             ) : (
-              <p>The verification link may be invalid or expired.</p>
+              <p>
+                If you've already verified your email, please try <Link to="/login">logging in</Link> instead.
+              </p>
             )}
           </div>
           <div className="form-footer">
