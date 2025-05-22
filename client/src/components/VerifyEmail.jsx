@@ -13,94 +13,112 @@ export default function VerifyEmail() {
   const navigate = useNavigate();
 
  useEffect(() => {
-    // Add a flag to track if we should make the verification request
-    let shouldVerify = true;
+  // Add a flag to track if we should make the verification request
+  let shouldVerify = true;
+  
+  // If already verified through login or page is refreshed after successful verification
+  if (user) {
+    setSuccess(true);
+    setVerifying(false);
+    shouldVerify = false;
     
-    // If already verified through login or page is refreshed after successful verification
-    if (user) {
-      setSuccess(true);
-      setVerifying(false);
-      shouldVerify = false;
-    }
+    // Redirect immediately if user is already set
+    navigate("/");
+    return;
+  }
 
-    // Check if this token was already verified in this session
-    const verificationId = localStorage.getItem("verificationId");
-    if (verificationId === token) {
-      setSuccess(true);
-      setVerifying(false);
-      shouldVerify = false;
-    }
+  // Check if this token was already verified in this session
+  const verificationId = localStorage.getItem("verificationId");
+  if (verificationId === token) {
+    setSuccess(true);
+    setVerifying(false);
+    shouldVerify = false;
     
-    // Only attempt verification once per component mount
-    if (verificationAttempted) {
-      shouldVerify = false;
-    }
+    // Add immediate redirect here too
+    navigate("/");
+    return;
+  }
+  
+  // Only attempt verification once per component mount
+  if (verificationAttempted) {
+    shouldVerify = false;
+  }
 
-    // Create an AbortController for cleanup
-    const controller = new AbortController();
-    let isMounted = true;
+  // Create an AbortController for cleanup
+  const controller = new AbortController();
+  let isMounted = true;
 
-    const doVerify = async () => {
-      if (!token || !shouldVerify) {
-        if (isMounted) {
-          setVerifying(false);
-          if (!token) {
-            setError("Invalid verification link");
-          }
+  const doVerify = async () => {
+    if (!token || !shouldVerify) {
+      if (isMounted) {
+        setVerifying(false);
+        if (!token) {
+          setError("Invalid verification link");
         }
-        return;
       }
+      return;
+    }
+    
+    try {
+      setVerificationAttempted(true);
+      console.log("Starting verification with token:", token);
       
-      try {
-        setVerificationAttempted(true);
-        console.log("Starting verification with token:", token);
+      // Use the abort controller with the request
+      const result = await verifyEmail(token);
+      console.log("Verification result:", result);
+
+      if (!isMounted) return;
+
+      if (result.success) {
+        // Store this token as verified to prevent repeated attempts
+        localStorage.setItem("verificationId", token);
+        setSuccess(true);
         
-        // Use the abort controller with the request
-        const result = await verifyEmail(token);
-        console.log("Verification result:", result);
-
-        if (!isMounted) return;
-
-        if (result.success) {
-          // Store this token as verified to prevent repeated attempts
-          localStorage.setItem("verificationId", token);
-          setSuccess(true);
-          
-          // Auto navigate to home after successful verification
-          setTimeout(() => {
-            if (isMounted) {
-              navigate("/");
-            }
-          }, 3000);
-        } else if (result.alreadyVerified) {
-          setSuccess(true);
-        } else {
-          setError(result.error?.msg || "Verification failed");
-        }
-      } catch (err) {
-        console.error("Verification error:", err);
-        if (isMounted) {
-          setError(err.message || "An error occurred during verification");
-        }
-      } finally {
-        if (isMounted) {
-          // Short delay to prevent flashing states
-          setTimeout(() => {
-            setVerifying(false);
-          }, 800);
-        }
+        // Improve redirect handling
+        console.log("Scheduling redirect to home page...");
+        
+        // Set a shorter timeout (2 seconds is enough to see the message)
+        setTimeout(() => {
+          if (isMounted) {
+            console.log("Executing redirect now");
+            navigate("/", { replace: true });
+          }
+        }, 2000);
+      } else if (result.alreadyVerified) {
+        setSuccess(true);
+        // Add redirect for already verified case too
+        setTimeout(() => {
+          if (isMounted) {
+            navigate("/", { replace: true });
+          }
+        }, 2000);
+      } else {
+        setError(result.error?.msg || "Verification failed");
       }
-    };
-
-    if (shouldVerify) {
-      doVerify();
+    } catch (err) {
+      console.error("Verification error:", err);
+      if (isMounted) {
+        setError(err.message || "An error occurred during verification");
+      }
+    } finally {
+      if (isMounted) {
+        // Short delay to prevent flashing states
+        setTimeout(() => {
+          setVerifying(false);
+        }, 800);
+      }
     }
-    
-    return () => {
-      isMounted = false;
-      controller.abort(); // Cancel any in-flight requests when component unmounts
-    };
-  }, [token, verifyEmail, navigate, user, verificationAttempted]);
+  };
+
+  if (shouldVerify) {
+    doVerify();
+  }
+  
+  return () => {
+    isMounted = false;
+    controller.abort(); // Cancel any in-flight requests when component unmounts
+  };
+}, [token, verifyEmail, navigate, user, verificationAttempted]);
 
   return (
     <div className="auth-card">
