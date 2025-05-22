@@ -51,7 +51,15 @@ export default function ResetPassword() {
           navigate("/");
         }, 2000);
       } else {
-        setValidToken(false);
+        // Check for already used token message
+        if (error && error.includes("already been used")) {
+          setValidToken(false);
+          setError(
+            "This reset link has already been used. Please request a new one."
+          );
+        } else {
+          setValidToken(false);
+        }
       }
     } finally {
       setIsSubmitting(false);

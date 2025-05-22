@@ -3,9 +3,10 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const User = require("../models/User");
+const Token = require("../models/Token");
 const mongoose = require("mongoose");
-const authMiddleware = require('../middleware/auth');
-const { jwtHelpers } = require('../config/jwt');
+const authMiddleware = require("../middleware/auth");
+const { jwtHelpers } = require("../config/jwt");
 const {
   sendPasswordResetEmail,
   sendWelcomeEmail,
@@ -14,31 +15,33 @@ const {
 } = require("../utils/emailService");
 
 const rateLimit = require("express-rate-limit");
-const Joi = require('joi');
+const Joi = require("joi");
 
-const validationSchemas = require('../utils/validationSchemas');
-const validateRequest = require('../middleware/validateRequest');
+const validationSchemas = require("../utils/validationSchemas");
+const validateRequest = require("../middleware/validateRequest");
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  message: { msg: "Too many login attempts, please try again later" }
+  message: { msg: "Too many login attempts, please try again later" },
 });
 
 const forgotPasswordLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
-  message: { msg: "Too many password reset requests, please try again later" }
+  message: { msg: "Too many password reset requests, please try again later" },
 });
 
 const otpLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 5,
-  message: { msg: "Too many OTP verification attempts, please try again later" }
+  message: {
+    msg: "Too many OTP verification attempts, please try again later",
+  },
 });
 
 router.post(
-  "/signup", 
+  "/signup",
   validateRequest(validationSchemas.signup),
   async (req, res) => {
     try {
@@ -63,7 +66,7 @@ router.post(
         isVerified: false,
         verificationToken: hashedToken,
         verificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        refreshTokens: []
+        refreshTokens: [],
       });
       await user.save();
 
@@ -99,9 +102,9 @@ router.post(
 );
 
 router.post(
-  "/login", 
+  "/login",
   validateRequest(validationSchemas.login),
-  authLimiter, 
+  authLimiter,
   async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -118,7 +121,7 @@ router.post(
 
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
-      
+
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
 
@@ -132,7 +135,9 @@ router.post(
         user.otpCode = undefined;
         user.otpExpires = undefined;
         await user.save();
-        return res.status(500).json({ msg: "Failed to send verification code" });
+        return res
+          .status(500)
+          .json({ msg: "Failed to send verification code" });
       }
 
       res.json({
@@ -148,7 +153,7 @@ router.post(
 );
 
 router.post(
-  "/verify-otp", 
+  "/verify-otp",
   validateRequest(validationSchemas.verifyOtp),
   otpLimiter,
   async (req, res) => {
@@ -186,41 +191,41 @@ router.post(
 
       user.otpCode = undefined;
       user.otpExpires = undefined;
-      
+
       const accessToken = jwtHelpers.generateAccessToken(user._id);
       const refreshToken = jwtHelpers.generateRefreshToken(user._id);
-      
+
       user.refreshTokens = user.refreshTokens || [];
-      
+
       user.refreshTokens.push({
         token: refreshToken,
-        createdAt: new Date()
+        createdAt: new Date(),
       });
-      
+
       if (user.refreshTokens.length > 5) {
         user.refreshTokens = user.refreshTokens.slice(-5);
       }
-      
+
       await user.save();
 
-      res.cookie('accessToken', accessToken, {
+      res.cookie("accessToken", accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 60 * 60 * 1000
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 1000,
       });
-      
-      res.cookie('refreshToken', refreshToken, {
+
+      res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/api/auth/refresh-token',
-        maxAge: 7 * 24 * 60 * 60 * 1000
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/auth/refresh-token",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       res.json({
         user: { id: user._id, name: user.name, email: user.email },
-        msg: "Authentication successful"
+        msg: "Authentication successful",
       });
     } catch (err) {
       console.error("OTP verification error:", err);
@@ -230,7 +235,7 @@ router.post(
 );
 
 router.post(
-  "/resend-otp", 
+  "/resend-otp",
   validateRequest(validationSchemas.resendOtp),
   otpLimiter,
   async (req, res) => {
@@ -260,7 +265,9 @@ router.post(
         user.otpCode = undefined;
         user.otpExpires = undefined;
         await user.save();
-        return res.status(500).json({ msg: "Failed to send verification code" });
+        return res
+          .status(500)
+          .json({ msg: "Failed to send verification code" });
       }
 
       res.json({
@@ -279,8 +286,10 @@ router.get("/user", authMiddleware, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ msg: "Invalid user ID format" });
     }
-    
-    const user = await User.findById(req.user.id).select("-password -refreshTokens");
+
+    const user = await User.findById(req.user.id).select(
+      "-password -refreshTokens"
+    );
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
@@ -292,7 +301,7 @@ router.get("/user", authMiddleware, async (req, res) => {
 });
 
 router.post(
-  "/forgot-password", 
+  "/forgot-password",
   validateRequest(validationSchemas.forgotPassword),
   forgotPasswordLimiter,
   async (req, res) => {
@@ -301,7 +310,9 @@ router.post(
 
       const user = await User.findOne({ email });
       if (!user) {
-        return res.json({ msg: "If your email is registered, you will receive a password reset link shortly" });
+        return res.json({
+          msg: "If your email is registered, you will receive a password reset link shortly",
+        });
       }
 
       const resetToken = crypto.randomBytes(32).toString("hex");
@@ -331,9 +342,7 @@ router.post(
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         await user.save();
-        return res
-          .status(500)
-          .json({ msg: "Failed to send reset email" });
+        return res.status(500).json({ msg: "Failed to send reset email" });
       }
     } catch (err) {
       console.error("Forgot password error:", err);
@@ -343,11 +352,19 @@ router.post(
 );
 
 router.post(
-  "/reset-password", 
+  "/reset-password",
   validateRequest(validationSchemas.resetPassword),
   async (req, res) => {
     try {
       const { token, password } = req.body;
+
+      // Check if token has been used before
+      const usedToken = await Token.findOne({ token, type: "reset" });
+      if (usedToken) {
+        return res
+          .status(400)
+          .json({ msg: "This reset link has already been used" });
+      }
 
       const resetPasswordToken = crypto
         .createHash("sha256")
@@ -363,6 +380,13 @@ router.post(
         return res.status(400).json({ msg: "Invalid or expired reset token" });
       }
 
+      // Save this token as used before proceeding
+      await new Token({
+        token,
+        type: "reset",
+        userId: user._id,
+      }).save();
+
       const salt = await bcrypt.genSalt(12);
       user.password = await bcrypt.hash(password, salt);
 
@@ -371,32 +395,32 @@ router.post(
 
       const accessToken = jwtHelpers.generateAccessToken(user._id);
       const refreshToken = jwtHelpers.generateRefreshToken(user._id);
-      
+
       user.refreshTokens = user.refreshTokens || [];
       user.refreshTokens.push({
         token: refreshToken,
-        createdAt: new Date()
+        createdAt: new Date(),
       });
-      
+
       if (user.refreshTokens.length > 5) {
         user.refreshTokens = user.refreshTokens.slice(-5);
       }
-      
+
       await user.save();
-      
-      res.cookie('accessToken', accessToken, {
+
+      res.cookie("accessToken", accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 60 * 60 * 1000
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 1000,
       });
-      
-      res.cookie('refreshToken', refreshToken, {
+
+      res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/api/auth/refresh-token',
-        maxAge: 7 * 24 * 60 * 60 * 1000 
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/auth/refresh-token",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       res.json({
@@ -415,7 +439,7 @@ router.post(
 );
 
 router.post(
-  "/resend-verification", 
+  "/resend-verification",
   validateRequest(validationSchemas.resendVerification),
   async (req, res) => {
     try {
@@ -469,55 +493,56 @@ router.post(
 router.post("/verify-email/:token", async (req, res) => {
   try {
     const originalToken = req.params.token;
-    
-    if (!originalToken || typeof originalToken !== 'string' || originalToken.length < 16) {
+
+    if (
+      !originalToken ||
+      typeof originalToken !== "string" ||
+      originalToken.length < 16
+    ) {
       return res.status(400).json({
         msg: "Invalid verification token format",
       });
     }
 
-    const verificationToken = crypto
-      .createHash("sha256")
-      .update(originalToken)
-      .digest("hex");
-
-    const db = mongoose.connection.db;
-    const verifiedTokens = db.collection("verifiedTokens");
-
-    const tokenRecord = await verifiedTokens.findOne({ originalToken });
-
-    if (tokenRecord) {
-      const user = await User.findById(tokenRecord.userId);
+    // Check if token has been used before
+    const usedToken = await Token.findOne({
+      token: originalToken,
+      type: "verification",
+    });
+    if (usedToken) {
+      // If token used before, check if the user is the same
+      const user = await User.findById(usedToken.userId);
 
       if (user) {
+        // If user exists and token was already used, issue new login tokens
         const accessToken = jwtHelpers.generateAccessToken(user._id);
         const refreshToken = jwtHelpers.generateRefreshToken(user._id);
-        
+
         user.refreshTokens = user.refreshTokens || [];
         user.refreshTokens.push({
           token: refreshToken,
-          createdAt: new Date()
+          createdAt: new Date(),
         });
-        
+
         if (user.refreshTokens.length > 5) {
           user.refreshTokens = user.refreshTokens.slice(-5);
         }
-        
+
         await user.save();
-        
-        res.cookie('accessToken', accessToken, {
+
+        res.cookie("accessToken", accessToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 60 * 60 * 1000
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: 60 * 60 * 1000,
         });
-        
-        res.cookie('refreshToken', refreshToken, {
+
+        res.cookie("refreshToken", refreshToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          path: '/api/auth/refresh-token',
-          maxAge: 7 * 24 * 60 * 60 * 1000
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          path: "/api/auth/refresh-token",
+          maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
         return res.json({
@@ -526,61 +551,64 @@ router.post("/verify-email/:token", async (req, res) => {
           user: { id: user._id, name: user.name, email: user.email },
         });
       }
+
+      return res.status(400).json({
+        msg: "This verification link has already been used. Please try logging in.",
+        alreadyVerified: true,
+      });
     }
+
+    const verificationToken = crypto
+      .createHash("sha256")
+      .update(originalToken)
+      .digest("hex");
 
     const user = await User.findOne({
       verificationToken,
     });
 
     if (!user) {
-      const recentlyVerifiedUsers = await User.find({
-        isVerified: true,
-        verificationToken: { $exists: false },
-      })
-        .sort({ _id: -1 })
-        .limit(5);
-
-      if (recentlyVerifiedUsers.length > 0) {
-        return res.status(400).json({
-          msg: "This verification link has already been used. Please try logging in.",
-          alreadyVerified: true,
-        });
-      }
-
       return res.status(400).json({
         msg: "Invalid verification token. Please sign up again.",
       });
     }
 
     if (user.isVerified) {
+      // Mark token as used even if user is already verified
+      await new Token({
+        token: originalToken,
+        type: "verification",
+        userId: user._id,
+      }).save();
+
       const accessToken = jwtHelpers.generateAccessToken(user._id);
       const refreshToken = jwtHelpers.generateRefreshToken(user._id);
-      
+
       user.refreshTokens = user.refreshTokens || [];
       user.refreshTokens.push({
         token: refreshToken,
-        createdAt: new Date()
+        createdAt: new Date(),
       });
-      
+
       if (user.refreshTokens.length > 5) {
         user.refreshTokens = user.refreshTokens.slice(-5);
       }
-      
+
       await user.save();
-      
-      res.cookie('accessToken', accessToken, {
+
+      res.cookie("accessToken", accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 60 * 60 * 1000
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 1000,
       });
-      
-      res.cookie('refreshToken', refreshToken, {
+
+      res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/api/auth/refresh-token',
-        maxAge: 7 * 24 * 60 * 60 * 1000
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/auth/refresh-token",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       return res.json({
@@ -597,45 +625,41 @@ router.post("/verify-email/:token", async (req, res) => {
       });
     }
 
-    try {
-      await verifiedTokens.insertOne({
-        originalToken,
-        hashedToken: verificationToken,
-        userId: user._id,
-        verifiedAt: new Date(),
-      });
-    } catch (err) {
-      console.error("Failed to record verified token:", err);
-    }
+    // Save this token as used
+    await new Token({
+      token: originalToken,
+      type: "verification",
+      userId: user._id,
+    }).save();
 
     user.isVerified = true;
     user.verificationToken = undefined;
     user.verificationExpires = undefined;
-    
+
     const accessToken = jwtHelpers.generateAccessToken(user._id);
     const refreshToken = jwtHelpers.generateRefreshToken(user._id);
-    
+
     user.refreshTokens = user.refreshTokens || [];
     user.refreshTokens.push({
       token: refreshToken,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
-    
+
     await user.save();
-    
-    res.cookie('accessToken', accessToken, {
+
+    res.cookie("accessToken", accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 1000,
     });
-    
-    res.cookie('refreshToken', refreshToken, {
+
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/api/auth/refresh-token',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/api/auth/refresh-token",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     try {
@@ -659,15 +683,15 @@ router.delete("/delete-account", authMiddleware, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ msg: "Invalid user ID format" });
     }
-    
+
     const user = await User.findByIdAndDelete(req.user.id);
 
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken', { path: '/api/auth/refresh-token' });
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken", { path: "/api/auth/refresh-token" });
 
     res.json({ msg: "Account successfully deleted" });
   } catch (err) {
@@ -677,8 +701,8 @@ router.delete("/delete-account", authMiddleware, async (req, res) => {
 });
 
 router.put(
-  "/update-name", 
-  authMiddleware, 
+  "/update-name",
+  authMiddleware,
   validateRequest(validationSchemas.updateName),
   async (req, res) => {
     try {
@@ -707,8 +731,8 @@ router.put(
 );
 
 router.put(
-  "/update-password", 
-  authMiddleware, 
+  "/update-password",
+  authMiddleware,
   validateRequest(validationSchemas.updatePassword),
   async (req, res) => {
     try {
@@ -743,8 +767,8 @@ router.put(
 );
 
 router.post(
-  "/validate-password", 
-  authMiddleware, 
+  "/validate-password",
+  authMiddleware,
   validateRequest(validationSchemas.validatePassword),
   async (req, res) => {
     try {
@@ -778,51 +802,55 @@ router.post(
 router.post("/refresh-token", async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
-    
+
     if (!refreshToken) {
       return res.status(401).json({ msg: "Refresh token not found" });
     }
-    
+
     const decoded = jwtHelpers.verifyToken(refreshToken);
-    if (!decoded || decoded.type !== 'refresh') {
+    if (!decoded || decoded.type !== "refresh") {
       return res.status(401).json({ msg: "Invalid refresh token" });
     }
-    
+
     const user = await User.findOne({
       _id: decoded.id,
-      'refreshTokens.token': refreshToken
+      "refreshTokens.token": refreshToken,
     });
-    
+
     if (!user) {
-      return res.status(401).json({ msg: "Token not found or user doesn't exist" });
+      return res
+        .status(401)
+        .json({ msg: "Token not found or user doesn't exist" });
     }
-    
+
     const newAccessToken = jwtHelpers.generateAccessToken(user._id);
     const newRefreshToken = jwtHelpers.generateRefreshToken(user._id);
 
-    user.refreshTokens = user.refreshTokens.filter(t => t.token !== refreshToken);
+    user.refreshTokens = user.refreshTokens.filter(
+      (t) => t.token !== refreshToken
+    );
     user.refreshTokens.push({
       token: newRefreshToken,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
-    
+
     await user.save();
-    
-    res.cookie('accessToken', newAccessToken, {
+
+    res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 1000,
     });
-    
-    res.cookie('refreshToken', newRefreshToken, {
+
+    res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/api/auth/refresh-token',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/api/auth/refresh-token",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    
+
     res.json({ msg: "Token refreshed successfully" });
   } catch (err) {
     console.error("Refresh token error:", err);
@@ -830,21 +858,20 @@ router.post("/refresh-token", async (req, res) => {
   }
 });
 
-
 router.post("/logout", authMiddleware, async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
-    
+
     if (refreshToken) {
       await User.updateOne(
         { _id: req.user.id },
         { $pull: { refreshTokens: { token: refreshToken } } }
       );
     }
-    
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken', { path: '/api/auth/refresh-token' });
-    
+
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken", { path: "/api/auth/refresh-token" });
+
     res.json({ msg: "Logged out successfully" });
   } catch (err) {
     console.error("Logout error:", err);
