@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/authUtils";
+import { postsAPI, setAuthToken } from "../utils/api";
 import LoadingSpinner from "./LoadingSpinner";
 
 export default function Login() {
@@ -30,7 +31,20 @@ export default function Login() {
       setResendingVerification(false);
     }
   };
-  
+
+  // Add API login handling
+  const handleApiLogin = async (email, password) => {
+    try {
+      const res = await postsAPI.apiLogin(email, password);
+      // Store the token
+      setAuthToken(res.data.token);
+      return true;
+    } catch (err) {
+      console.error("API login error:", err);
+      return false;
+    }
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -44,20 +58,21 @@ export default function Login() {
         if (result.requiresOtp) {
           navigate("/verify-otp");
         } else {
+          // If regular login succeeded, also do API login for posts
+          await handleApiLogin(form.email, form.password);
           navigate("/");
         }
       } else if (result.pendingVerification) {
         setPendingVerification(true);
         setVerificationEmail(result.email);
       }
-
-      setIsLoading(false);
     } catch (err) {
       console.error("Login failed:", err);
+    } finally {
       setIsLoading(false);
     }
   };
-  
+
   return (
     <div className="auth-card">
       {pendingVerification ? (

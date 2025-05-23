@@ -25,37 +25,52 @@ const api = axios.create({
 
 const methodsRequiringCsrf = ["post", "put", "delete", "patch"];
 
+export const setAuthToken = (token) => {
+  if (token) {
+    localStorage.setItem('token', token);
+    axios.defaults.headers.common['x-auth-token'] = token;
+    api.defaults.headers.common['x-auth-token'] = token;
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  } else {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['x-auth-token'];
+    delete api.defaults.headers.common['x-auth-token'];
+    delete api.defaults.headers.common['Authorization'];
+  }
+};
+
+// Initialize auth token from localStorage on app startup
+export const initializeAuth = () => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    setAuthToken(token);
+    return token;
+  }
+  return null;
+};
+
+// Initialize token from storage on module load
+initializeAuth();
+
 let csrfToken = null;
 
-// Track whether we're in the initial auth check
-let isInitialAuthCheck = true;
-
-const hasCookie = (name) => {
-  return document.cookie
-    .split(";")
-    .some((c) => c.trim().startsWith(`${name}=`));
+// Export post-related API functions
+export const postsAPI = {
+  getPosts: (page = 1, limit = 10) => 
+    api.get(`/api/posts?page=${page}&limit=${limit}`),
+  createPost: (content) => 
+    api.post('/api/posts', { content }),
+  updatePost: (id, content) => 
+    api.put(`/api/posts/${id}`, { content }),
+  deletePost: (id) => 
+    api.delete(`/api/posts/${id}`),
+  apiLogin: (email, password) => 
+    api.post('/api/auth/login', { email, password }),
 };
 
 api.interceptors.request.use(
   async (config) => {
     const method = config.method.toLowerCase();
-
-    // For auth endpoints during initial load, check for cookies first
-    if (
-      isInitialAuthCheck &&
-      (config.url.includes("/api/auth/user") ||
-        config.url.includes("/api/auth/refresh-token"))
-    ) {
-      // If no refresh token cookie, cancel the request to avoid 401s
-      if (!hasCookie("refreshToken")) {
-        // Create a canceled request to avoid showing 401 errors
-        const cancelToken = axios.CancelToken.source();
-        config.cancelToken = cancelToken.token;
-        setTimeout(() => {
-          cancelToken.cancel("No authentication token found");
-        }, 0);
-      }
-    }
 
     // Only add CSRF token for state-changing requests
     if (
@@ -81,77 +96,63 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Ignore canceled requests (they're intentionally canceled)
+    // Ignore canceled requests
     if (axios.isCancel(error)) {
       console.log("Request canceled:", error.message);
-      // Return a resolved promise with a custom response to avoid errors
-      return Promise.resolve({
-        data: null,
-        status: 401,
-        statusText: "Unauthorized",
-        headers: {},
-        config: error.config,
-        __canceled: true,
-      });
+      return Promise.reject(error);
     }
 
     const originalRequest = error.config;
 
-    // If the error is due to CSRF token being invalid (403)
+    // For CSRF token errors
     if (
       error.response?.status === 403 &&
       error.response?.data?.msg?.includes("CSRF token") &&
       !originalRequest._retryCSRF
     ) {
       originalRequest._retryCSRF = true;
-
-      // Fetch a new CSRF token
       csrfToken = await getCsrfToken();
-
-      // Retry the original request
       return api(originalRequest);
     }
 
-    // Handle 401 errors differently based on request type
+    // For 401 errors - try token refresh once
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
-      // For initial auth check or refresh token endpoint, fail silently
-      const isAuthEndpoint =
-        originalRequest.url.includes("/api/auth/user") ||
+      
+      // Skip auth-related endpoints to avoid infinite loops
+      const isAuthEndpoint = 
         originalRequest.url.includes("/api/auth/refresh-token");
-
-      // Exit early with the original error for initial auth check
-      if (isAuthEndpoint && isInitialAuthCheck) {
-        // We've completed the initial auth check
-        isInitialAuthCheck = false;
-        return Promise.reject(error);
-      }
-
-      try {
-        // Try to refresh the token
-        await axios.post(
-          `${API_URL}/api/auth/refresh-token`,
-          {},
-          {
-            withCredentials: true,
+      
+      if (!isAuthEndpoint) {
+        try {
+          // Try to refresh the token without checking for cookie
+          console.log("Attempting to refresh token due to 401 error");
+          await axios.post(
+            `${API_URL}/api/auth/refresh-token`,
+            {},
+            { withCredentials: true }
+          );
+          
+          // Reinitialize the auth token after refresh
+          initializeAuth();
+          
+          console.log("Token refresh succeeded, retrying original request");
+          return api(originalRequest);
+        } catch (refreshError) {
+          console.error("Token refresh failed:", refreshError);
+          
+          // Only redirect for non-background requests
+          const isBackgroundCheck = 
+            originalRequest.url.includes("/api/auth/user");
+            
+          if (!isBackgroundCheck && !isAuthEndpoint) {
+            console.log("Redirecting to login after failed token refresh");
+            setTimeout(() => {
+              window.location.href = "/login";
+            }, 100);
           }
-        );
-
-        // Retry the original request if token refresh succeeds
-        return api(originalRequest);
-      } catch (refreshError) {
-        // Only redirect for user-initiated actions
-        if (!isAuthEndpoint) {
-          window.location.href = "/login";
         }
-        return Promise.reject(refreshError);
       }
-    }
-
-    // Mark initial auth check as complete even on other errors
-    if (originalRequest.url.includes("/api/auth/user")) {
-      isInitialAuthCheck = false;
     }
 
     return Promise.reject(error);
