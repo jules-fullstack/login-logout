@@ -205,17 +205,6 @@ export default function Home() {
 
   return (
     <div className="dashboard-container">
-      {/* Modern Header with User Info */}
-      <header className="app-header">
-        <div className="user-profile" onClick={() => setShowConfirmation(true)}>
-          <div className="avatar">{user.name.charAt(0).toUpperCase()}</div>
-          <div className="user-info">
-            <p className="user-name">{user.name}</p>
-            <p className="user-email">{user.email}</p>
-          </div>
-        </div>
-      </header>
-
       <main className="content-area">
         {/* Post Creation Card */}
         <div className="post-creation-card">

@@ -770,16 +770,9 @@ router.post("/verify-email/:token", async (req, res) => {
       });
 
       return res.json({
-        msg: "Email already verified. You can now log in.",
+        msg: "Email already verified. You are now logged in.",
         alreadyVerified: true,
         user: { id: user._id, name: user.name, email: user.email },
-      });
-    }
-
-    if (user.verificationExpires && user.verificationExpires < Date.now()) {
-      return res.status(400).json({
-        msg: "Verification link has expired. Please request a new one.",
-        expired: true,
       });
     }
 
@@ -959,7 +952,7 @@ router.post("/refresh-token", async (req, res) => {
     console.log("⭐ Refresh token route called");
     console.log("⭐ Cookies received:", req.cookies);
     console.log("⭐ Cookie header:", req.headers.cookie);
-    
+
     const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
@@ -970,12 +963,12 @@ router.post("/refresh-token", async (req, res) => {
     try {
       const decoded = jwtHelpers.verifyToken(refreshToken);
       console.log("✅ Refresh token decoded:", decoded);
-      
+
       if (!decoded || decoded.type !== "refresh") {
         console.log("❌ Invalid refresh token type:", decoded?.type);
         return res.status(401).json({ msg: "Invalid refresh token" });
       }
-      
+
       const user = await User.findOne({
         _id: decoded.id,
         "refreshTokens.token": refreshToken,
@@ -983,11 +976,13 @@ router.post("/refresh-token", async (req, res) => {
 
       if (!user) {
         console.log("❌ User not found with token");
-        return res.status(401).json({ msg: "Token not found or user doesn't exist" });
+        return res
+          .status(401)
+          .json({ msg: "Token not found or user doesn't exist" });
       }
 
       console.log("✅ User found:", user._id);
-      
+
       // Rest of your existing code for generating new tokens
       const newAccessToken = jwtHelpers.generateAccessToken(user._id);
       const newRefreshToken = jwtHelpers.generateRefreshToken(user._id);
@@ -1021,7 +1016,9 @@ router.post("/refresh-token", async (req, res) => {
       res.json({ msg: "Token refreshed successfully" });
     } catch (tokenError) {
       console.error("❌ Token verification error:", tokenError);
-      return res.status(401).json({ msg: "Invalid refresh token: " + tokenError.message });
+      return res
+        .status(401)
+        .json({ msg: "Invalid refresh token: " + tokenError.message });
     }
   } catch (err) {
     console.error("❌ Refresh token route error:", err);
@@ -1054,12 +1051,12 @@ router.get("/check-auth-status", (req, res) => {
   try {
     const accessToken = req.cookies.accessToken;
     const refreshToken = req.cookies.refreshToken;
-    
+
     let accessTokenStatus = "Invalid";
     let refreshTokenStatus = "Invalid";
     let accessTokenExpiry = null;
     let refreshTokenExpiry = null;
-    
+
     if (accessToken) {
       try {
         const decoded = jwtHelpers.verifyToken(accessToken);
@@ -1071,7 +1068,7 @@ router.get("/check-auth-status", (req, res) => {
         accessTokenStatus = "Invalid: " + err.message;
       }
     }
-    
+
     if (refreshToken) {
       try {
         const decoded = jwtHelpers.verifyToken(refreshToken);
@@ -1083,7 +1080,7 @@ router.get("/check-auth-status", (req, res) => {
         refreshTokenStatus = "Invalid: " + err.message;
       }
     }
-    
+
     res.json({
       hasAccessToken: !!accessToken,
       hasRefreshToken: !!refreshToken,
@@ -1092,7 +1089,7 @@ router.get("/check-auth-status", (req, res) => {
       accessTokenExpiry,
       refreshTokenExpiry,
       cookieHeader: req.headers.cookie,
-      rawCookies: req.cookies
+      rawCookies: req.cookies,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1104,7 +1101,7 @@ router.get("/test-cookies", (req, res) => {
     // Create test tokens
     const testAccessToken = jwtHelpers.generateAccessToken("test-user-id");
     const testRefreshToken = jwtHelpers.generateRefreshToken("test-user-id");
-    
+
     // Set cookies
     res.cookie("accessToken", testAccessToken, {
       httpOnly: true,
@@ -1120,11 +1117,11 @@ router.get("/test-cookies", (req, res) => {
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    
+
     res.json({
       msg: "Test cookies set successfully",
       accessToken: testAccessToken,
-      refreshToken: testRefreshToken
+      refreshToken: testRefreshToken,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

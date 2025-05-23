@@ -6,7 +6,7 @@ const { jwtHelpers } = require("../config/jwt");
 const apiAuth = require("../middleware/apiAuth");
 
 // API Login route - returns JWT token
-router.post("/auth/login", async (req, res) => {
+router.post("/external/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     

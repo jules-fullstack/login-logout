@@ -26,27 +26,53 @@ export default function VerifyEmail() {
     }
   }, [success, navigate]);
 
-  // Main verification effect
+  // Check if already verified on component mount
+  useEffect(() => {
+    const checkVerificationStatus = () => {
+      // If user is already logged in, show success
+      if (user) {
+        setSuccess(true);
+        setVerifying(false);
+        return true;
+      }
+
+      // Check if we've already verified this token before
+      const verificationId = localStorage.getItem("verificationId");
+      if (verificationId === token) {
+        setSuccess(true);
+        setVerifying(false);
+        return true;
+      }
+
+      // Check processed tokens
+      try {
+        const processedTokens = JSON.parse(
+          localStorage.getItem("processedVerificationTokens") || "[]"
+        );
+        if (processedTokens.includes(token)) {
+          setSuccess(true);
+          setVerifying(false);
+          return true;
+        }
+      } catch (e) {
+        console.error("Error checking processed tokens:", e);
+      }
+
+      return false;
+    };
+
+    if (checkVerificationStatus()) {
+      // Already verified, no need to continue
+      verificationAttemptedRef.current = true;
+    }
+  }, [token, user]);
+
+  // Main verification effect - runs only if not already verified
   useEffect(() => {
     if (verificationAttemptedRef.current) return;
 
     let isMounted = true;
     const controller = new AbortController();
-
-    // If user is already logged in, show success and end
-    if (user) {
-      setSuccess(true);
-      setVerifying(false);
-      return;
-    }
-
-    // Check if we've already verified this token before
-    const verificationId = localStorage.getItem("verificationId");
-    if (verificationId === token) {
-      setSuccess(true);
-      setVerifying(false);
-      return;
-    }
 
     const doVerify = async () => {
       if (!token) {
@@ -58,14 +84,32 @@ export default function VerifyEmail() {
       }
 
       try {
+        console.log("Starting email verification...");
         verificationAttemptedRef.current = true;
 
         const result = await verifyEmail(token);
+        console.log("Verification result:", result);
 
         if (!isMounted) return;
 
         if (result.success) {
           localStorage.setItem("verificationId", token);
+          // Also store in processed tokens
+          try {
+            const processedTokens = JSON.parse(
+              localStorage.getItem("processedVerificationTokens") || "[]"
+            );
+            if (!processedTokens.includes(token)) {
+              processedTokens.push(token);
+              localStorage.setItem(
+                "processedVerificationTokens",
+                JSON.stringify(processedTokens)
+              );
+            }
+          } catch (e) {
+            console.error("Error updating processed tokens:", e);
+          }
+
           setSuccess(true);
           setVerifying(false);
         } else {
@@ -81,13 +125,25 @@ export default function VerifyEmail() {
       }
     };
 
+    // Add a timeout to prevent infinite loading
+    const verificationTimeout = setTimeout(() => {
+      if (isMounted && verifying) {
+        console.log("Verification timed out");
+        setVerifying(false);
+        setError(
+          "Verification is taking longer than expected. Please try logging in directly."
+        );
+      }
+    }, 10000); // 10 seconds timeout
+
     doVerify();
 
     return () => {
       isMounted = false;
       controller.abort();
+      clearTimeout(verificationTimeout);
     };
-  }, [token, verifyEmail, user]);
+  }, [token, verifyEmail]);
 
   // Render the component
   return (
@@ -102,7 +158,7 @@ export default function VerifyEmail() {
         <div className="verification-success">
           <div className="success-message">
             <p>Your email has been successfully verified!</p>
-            <p>You are now logged in and will be redirected to your account.</p>
+            <p>You will be redirected to your account shortly.</p>
           </div>
           <div className="form-footer">
             <p>
