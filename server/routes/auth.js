@@ -304,15 +304,15 @@ router.post(
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
         maxAge: 60 * 60 * 1000,
       });
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/api/auth/refresh-token",
+        sameSite: "lax",
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -516,15 +516,15 @@ router.post(
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
         maxAge: 60 * 60 * 1000,
       });
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/api/auth/refresh-token",
+        sameSite: "lax",
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -653,15 +653,15 @@ router.post("/verify-email/:token", async (req, res) => {
         res.cookie("accessToken", accessToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
+          sameSite: "lax",
           maxAge: 60 * 60 * 1000,
         });
 
         res.cookie("refreshToken", refreshToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
-          path: "/api/auth/refresh-token",
+          sameSite: "lax",
+          path: "/",
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
@@ -692,15 +692,15 @@ router.post("/verify-email/:token", async (req, res) => {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
         maxAge: 60 * 60 * 1000,
       });
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/api/auth/refresh-token",
+        sameSite: "lax",
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -756,15 +756,15 @@ router.post("/verify-email/:token", async (req, res) => {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
         maxAge: 60 * 60 * 1000,
       });
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/api/auth/refresh-token",
+        sameSite: "lax",
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -807,15 +807,15 @@ router.post("/verify-email/:token", async (req, res) => {
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 60 * 60 * 1000,
     });
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/api/auth/refresh-token",
+      sameSite: "lax",
+      path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -845,7 +845,7 @@ router.delete("/delete-account", authMiddleware, async (req, res) => {
     }
 
     res.clearCookie("accessToken");
-    res.clearCookie("refreshToken", { path: "/api/auth/refresh-token" });
+    res.clearCookie("refreshToken", { path: "/" });
 
     res.json({ msg: "Account successfully deleted" });
   } catch (err) {
@@ -955,59 +955,75 @@ router.post(
 
 router.post("/refresh-token", async (req, res) => {
   try {
+    console.log("⭐ Refresh token route called");
+    console.log("⭐ Cookies received:", req.cookies);
+    console.log("⭐ Cookie header:", req.headers.cookie);
+    
     const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
+      console.log("❌ Refresh token not found in cookies");
       return res.status(401).json({ msg: "Refresh token not found" });
     }
 
-    const decoded = jwtHelpers.verifyToken(refreshToken);
-    if (!decoded || decoded.type !== "refresh") {
-      return res.status(401).json({ msg: "Invalid refresh token" });
+    try {
+      const decoded = jwtHelpers.verifyToken(refreshToken);
+      console.log("✅ Refresh token decoded:", decoded);
+      
+      if (!decoded || decoded.type !== "refresh") {
+        console.log("❌ Invalid refresh token type:", decoded?.type);
+        return res.status(401).json({ msg: "Invalid refresh token" });
+      }
+      
+      const user = await User.findOne({
+        _id: decoded.id,
+        "refreshTokens.token": refreshToken,
+      });
+
+      if (!user) {
+        console.log("❌ User not found with token");
+        return res.status(401).json({ msg: "Token not found or user doesn't exist" });
+      }
+
+      console.log("✅ User found:", user._id);
+      
+      // Rest of your existing code for generating new tokens
+      const newAccessToken = jwtHelpers.generateAccessToken(user._id);
+      const newRefreshToken = jwtHelpers.generateRefreshToken(user._id);
+
+      user.refreshTokens = user.refreshTokens.filter(
+        (t) => t.token !== refreshToken
+      );
+      user.refreshTokens.push({
+        token: newRefreshToken,
+        createdAt: new Date(),
+      });
+
+      await user.save();
+
+      res.cookie("accessToken", newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 1000,
+      });
+
+      res.cookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      console.log("✅ New tokens generated and cookies set");
+      res.json({ msg: "Token refreshed successfully" });
+    } catch (tokenError) {
+      console.error("❌ Token verification error:", tokenError);
+      return res.status(401).json({ msg: "Invalid refresh token: " + tokenError.message });
     }
-
-    const user = await User.findOne({
-      _id: decoded.id,
-      "refreshTokens.token": refreshToken,
-    });
-
-    if (!user) {
-      return res
-        .status(401)
-        .json({ msg: "Token not found or user doesn't exist" });
-    }
-
-    const newAccessToken = jwtHelpers.generateAccessToken(user._id);
-    const newRefreshToken = jwtHelpers.generateRefreshToken(user._id);
-
-    user.refreshTokens = user.refreshTokens.filter(
-      (t) => t.token !== refreshToken
-    );
-    user.refreshTokens.push({
-      token: newRefreshToken,
-      createdAt: new Date(),
-    });
-
-    await user.save();
-
-    res.cookie("accessToken", newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 60 * 60 * 1000,
-    });
-
-    res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/api/auth/refresh-token",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.json({ msg: "Token refreshed successfully" });
   } catch (err) {
-    console.error("Refresh token error:", err);
+    console.error("❌ Refresh token route error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 });
@@ -1024,12 +1040,93 @@ router.post("/logout", authMiddleware, async (req, res) => {
     }
 
     res.clearCookie("accessToken");
-    res.clearCookie("refreshToken", { path: "/api/auth/refresh-token" });
+    res.clearCookie("refreshToken", { path: "/" });
 
     res.json({ msg: "Logged out successfully" });
   } catch (err) {
     console.error("Logout error:", err);
     res.status(500).json({ msg: "Server error" });
+  }
+});
+
+router.get("/check-auth-status", (req, res) => {
+  try {
+    const accessToken = req.cookies.accessToken;
+    const refreshToken = req.cookies.refreshToken;
+    
+    let accessTokenStatus = "Invalid";
+    let refreshTokenStatus = "Invalid";
+    let accessTokenExpiry = null;
+    let refreshTokenExpiry = null;
+    
+    if (accessToken) {
+      try {
+        const decoded = jwtHelpers.verifyToken(accessToken);
+        accessTokenStatus = decoded ? "Valid" : "Invalid";
+        if (decoded) {
+          accessTokenExpiry = new Date(decoded.exp * 1000).toISOString();
+        }
+      } catch (err) {
+        accessTokenStatus = "Invalid: " + err.message;
+      }
+    }
+    
+    if (refreshToken) {
+      try {
+        const decoded = jwtHelpers.verifyToken(refreshToken);
+        refreshTokenStatus = decoded ? "Valid" : "Invalid";
+        if (decoded) {
+          refreshTokenExpiry = new Date(decoded.exp * 1000).toISOString();
+        }
+      } catch (err) {
+        refreshTokenStatus = "Invalid: " + err.message;
+      }
+    }
+    
+    res.json({
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      accessTokenStatus,
+      refreshTokenStatus,
+      accessTokenExpiry,
+      refreshTokenExpiry,
+      cookieHeader: req.headers.cookie,
+      rawCookies: req.cookies
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/test-cookies", (req, res) => {
+  try {
+    // Create test tokens
+    const testAccessToken = jwtHelpers.generateAccessToken("test-user-id");
+    const testRefreshToken = jwtHelpers.generateRefreshToken("test-user-id");
+    
+    // Set cookies
+    res.cookie("accessToken", testAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 1000,
+    });
+
+    res.cookie("refreshToken", testRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    
+    res.json({
+      msg: "Test cookies set successfully",
+      accessToken: testAccessToken,
+      refreshToken: testRefreshToken
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

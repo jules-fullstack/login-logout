@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import AuthContext from "./authUtils";
 import { authAPI } from "../utils/api";
+import axios from "axios";
+
+// Add this to access the API_URL
+const API_URL =
+  window._env_?.API_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -12,25 +19,34 @@ export function AuthProvider({ children }) {
     const checkAuth = async () => {
       try {
         setLoading(true);
-        // First check if refreshToken cookie exists before making requests
-        const cookies = document.cookie.split(";");
-        const hasRefreshToken = cookies.some((cookie) =>
-          cookie.trim().startsWith("refreshToken=")
-        );
 
-        // Only try to authenticate if there's a refresh token cookie
-        if (hasRefreshToken) {
+        // Skip cookie checks and directly try to get auth status
+        try {
+          // First try to get user data directly
+          const userRes = await authAPI.getUser();
+          setUser(userRes.data);
+        } catch (userErr) {
+          console.log("User fetch failed, trying token refresh:", userErr);
+
           try {
-            const res = await authAPI.getUser();
-            setUser(res.data);
-          } catch (err) {
-            // Silent failure is expected for unauthenticated users
+            // Try to refresh the token
+            await axios.post(
+              `${API_URL}/api/auth/refresh-token`,
+              {},
+              { withCredentials: true }
+            );
+
+            // Then try to get user data again
+            const userRes = await authAPI.getUser();
+            setUser(userRes.data);
+          } catch (refreshErr) {
+            console.log("Auth failed after refresh attempt:", refreshErr);
             setUser(null);
           }
-        } else {
-          // Skip authentication attempts if no cookie
-          setUser(null);
         }
+      } catch (err) {
+        console.log("Auth check failed:", err);
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -38,7 +54,6 @@ export function AuthProvider({ children }) {
 
     checkAuth();
   }, []);
-
   useEffect(() => {
     if (!user) return;
 
