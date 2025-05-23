@@ -1267,3 +1267,150 @@ button .loading-spinner-small .spinner {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.post-card-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.post-actions-menu {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.post-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+}
+
+.post-action-btn:hover {
+  background-color: #f3f4f6;
+  transform: none;
+  box-shadow: none;
+}
+
+.post-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.post-edit-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.save-edit-btn, .cancel-edit-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: auto;
+  margin-top: 0;
+}
+
+.save-edit-btn {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+}
+
+.save-edit-btn:hover:not(:disabled) {
+  background-color: #2563eb;
+  transform: none;
+  box-shadow: none;
+}
+
+.cancel-edit-btn {
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.cancel-edit-btn:hover:not(:disabled) {
+  background-color: #e5e7eb;
+  transform: none;
+  box-shadow: none;
+}
+
+.modal-card.small {
+  max-width: 400px;
+}
+
+.confirmation-message {
+  margin-bottom: 20px;
+  text-align: center;
+  color: #4b5563;
+}
+
+.confirmation-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.confirm-delete-btn {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: auto;
+  margin-top: 0;
+}
+
+.confirm-delete-btn:hover {
+  background-color: #dc2626;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Fix for the cancel-btn class conflict */
+.confirmation-actions .cancel-btn {
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: initial;
+  min-height: initial;
+  width: auto;
+  margin-top: 0;
+}
+
+.confirmation-actions .cancel-btn:hover {
+  background-color: #e5e7eb;
+  transform: none;
+  box-shadow: none;
+}

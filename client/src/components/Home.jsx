@@ -17,8 +17,14 @@ export default function Home() {
     page: 1,
     totalPages: 1,
   });
+  // States for edit/delete functionality
+  const [editingPostId, setEditingPostId] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [updatingPost, setUpdatingPost] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  
   const navigate = useNavigate();
-
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -46,8 +52,6 @@ export default function Home() {
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]); // fetchPosts is stable now, so this is safe
-
-
   
   const handlePostSubmit = async (e) => {
     e.preventDefault();
@@ -70,15 +74,82 @@ export default function Home() {
     }
   };
 
+  // Handle starting edit mode for a post
+  const handleEditPost = (post) => {
+    setEditingPostId(post._id);
+    setEditContent(post.content);
+  };
+
+  // Handle canceling edit mode
+  const handleCancelEdit = () => {
+    setEditingPostId(null);
+    setEditContent("");
+  };
+
+  // Handle saving edited post
+  const handleSaveEdit = async (postId) => {
+    if (!editContent.trim()) return;
+    
+    try {
+      setUpdatingPost(true);
+      
+      const res = await postsAPI.updatePost(postId, editContent);
+      
+      // Update the post in the state
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post._id === postId ? res.data : post
+        )
+      );
+      
+      // Exit edit mode
+      setEditingPostId(null);
+      setEditContent("");
+    } catch (err) {
+      console.error("Error updating post:", err);
+      setPostError("Failed to update post. Please try again.");
+    } finally {
+      setUpdatingPost(false);
+    }
+  };
+
+  // Handle showing delete confirmation
+  const handleDeletePrompt = (postId) => {
+    setDeletingPostId(postId);
+    setShowDeleteConfirmation(true);
+  };
+
+  // Handle canceling delete
+  const handleCancelDelete = () => {
+    setShowConfirmation(false);
+    setShowDeleteConfirmation(false);
+    setDeletingPostId(null);
+  };
+
+  // Handle confirming post delete
+  const handleConfirmPostDelete = async () => {
+    try {
+      await postsAPI.deletePost(deletingPostId);
+      
+      // Remove the post from state
+      setPosts(prevPosts => 
+        prevPosts.filter(post => post._id !== deletingPostId)
+      );
+      
+      // Close the confirmation dialog
+      setShowDeleteConfirmation(false);
+      setDeletingPostId(null);
+    } catch (err) {
+      console.error("Error deleting post:", err);
+      setPostError("Failed to delete post. Please try again.");
+    }
+  };
+
   const handleLogout = () => {
     // Clear auth token from localStorage
     setAuthToken(null);
     logout();
     navigate("/login");
-  };
-
-  const handleCancelDelete = () => {
-    setShowConfirmation(false);
   };
 
   const handleConfirmDelete = async () => {
@@ -110,6 +181,11 @@ export default function Home() {
       hour: '2-digit', 
       minute: '2-digit'
     });
+  };
+
+  // Check if current user is the post owner
+  const isPostOwner = (post) => {
+    return post.user_id._id === user.id;
   };
 
   return (
@@ -197,8 +273,57 @@ export default function Home() {
                         <div className="post-author">{post.user_id.name}</div>
                         <div className="post-time">{formatDate(post.createdAt)}</div>
                       </div>
+                      
+                      {/* Post Actions (Edit/Delete) for post owner */}
+                      {isPostOwner(post) && (
+                        <div className="post-actions-menu">
+                          <button 
+                            className="post-action-btn edit"
+                            onClick={() => handleEditPost(post)}
+                            title="Edit post"
+                          >
+                            ✏️
+                          </button>
+                          <button 
+                            className="post-action-btn delete"
+                            onClick={() => handleDeletePrompt(post._id)}
+                            title="Delete post"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="post-content">{post.content}</div>
+                    
+                    {/* Show edit form or regular content */}
+                    {editingPostId === post._id ? (
+                      <div className="post-edit-form">
+                        <textarea
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="post-edit-textarea"
+                          disabled={updatingPost}
+                        />
+                        <div className="edit-actions">
+                          <button 
+                            onClick={() => handleSaveEdit(post._id)}
+                            className="save-edit-btn"
+                            disabled={!editContent.trim() || updatingPost}
+                          >
+                            {updatingPost ? 'Saving...' : 'Save'}
+                          </button>
+                          <button 
+                            onClick={handleCancelEdit}
+                            className="cancel-edit-btn"
+                            disabled={updatingPost}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="post-content">{post.content}</div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -217,7 +342,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Modern Delete Account Modal */}
+      {/* Account Options Modal */}
       {showConfirmation && (
         <div className="modal-overlay">
           <div className="modal-card">
@@ -244,6 +369,37 @@ export default function Home() {
                 </div>
               )}
               {error && <div className="error-message">{error}</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Post Confirmation Modal */}
+      {showDeleteConfirmation && (
+        <div className="modal-overlay">
+          <div className="modal-card small">
+            <div className="modal-header">
+              <h3>Delete Post</h3>
+              <button className="close-button" onClick={handleCancelDelete}>×</button>
+            </div>
+            <div className="modal-content">
+              <p className="confirmation-message">
+                Are you sure you want to delete this post? This action cannot be undone.
+              </p>
+              <div className="confirmation-actions">
+                <button 
+                  className="confirm-delete-btn"
+                  onClick={handleConfirmPostDelete}
+                >
+                  Delete
+                </button>
+                <button 
+                  className="cancel-btn"
+                  onClick={handleCancelDelete}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
