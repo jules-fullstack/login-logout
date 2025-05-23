@@ -25,21 +25,32 @@ const api = axios.create({
 
 const methodsRequiringCsrf = ["post", "put", "delete", "patch"];
 
-const setAuthToken = (token) => {
+export const setAuthToken = (token) => {
   if (token) {
+    localStorage.setItem('token', token);
+    axios.defaults.headers.common['x-auth-token'] = token;
+    api.defaults.headers.common['x-auth-token'] = token;
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    localStorage.setItem('authToken', token);
   } else {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['x-auth-token'];
+    delete api.defaults.headers.common['x-auth-token'];
     delete api.defaults.headers.common['Authorization'];
-    localStorage.removeItem('authToken');
   }
 };
 
-// Initialize token from storage
-const token = localStorage.getItem('authToken');
-if (token) {
-  setAuthToken(token);
-}
+// Initialize auth token from localStorage on app startup
+export const initializeAuth = () => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    setAuthToken(token);
+    return token;
+  }
+  return null;
+};
+
+// Initialize token from storage on module load
+initializeAuth();
 
 let csrfToken = null;
 
@@ -56,9 +67,6 @@ export const postsAPI = {
   apiLogin: (email, password) => 
     api.post('/api/auth/login', { email, password }),
 };
-
-// Export the setAuthToken function
-export { setAuthToken };
 
 api.interceptors.request.use(
   async (config) => {
@@ -124,6 +132,9 @@ api.interceptors.response.use(
             {},
             { withCredentials: true }
           );
+          
+          // Reinitialize the auth token after refresh
+          initializeAuth();
           
           console.log("Token refresh succeeded, retrying original request");
           return api(originalRequest);

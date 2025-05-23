@@ -23,14 +23,14 @@ export default function Home() {
   const [updatingPost, setUpdatingPost] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  
+
   const navigate = useNavigate();
 
   const fetchPosts = useCallback(async () => {
     try {
       setPostsLoading(true);
       const res = await postsAPI.getPosts(pagination.page);
-      setPosts(prevPosts => {
+      setPosts((prevPosts) => {
         // If we're on page 1, replace all posts
         // Otherwise append new posts to existing ones
         if (pagination.page === 1) {
@@ -52,19 +52,19 @@ export default function Home() {
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]); // fetchPosts is stable now, so this is safe
-  
+
   const handlePostSubmit = async (e) => {
     e.preventDefault();
     if (!postContent.trim()) return;
-    
+
     try {
       setCreatingPost(true);
       setPostError(null);
-      
+
       const res = await postsAPI.createPost(postContent);
-      
+
       // Add the new post to the top of the list
-      setPosts(prevPosts => [res.data, ...prevPosts]);
+      setPosts((prevPosts) => [res.data, ...prevPosts]);
       setPostContent("");
     } catch (err) {
       console.error("Error creating post:", err);
@@ -89,19 +89,17 @@ export default function Home() {
   // Handle saving edited post
   const handleSaveEdit = async (postId) => {
     if (!editContent.trim()) return;
-    
+
     try {
       setUpdatingPost(true);
-      
+
       const res = await postsAPI.updatePost(postId, editContent);
-      
+
       // Update the post in the state
-      setPosts(prevPosts => 
-        prevPosts.map(post => 
-          post._id === postId ? res.data : post
-        )
+      setPosts((prevPosts) =>
+        prevPosts.map((post) => (post._id === postId ? res.data : post))
       );
-      
+
       // Exit edit mode
       setEditingPostId(null);
       setEditContent("");
@@ -130,12 +128,12 @@ export default function Home() {
   const handleConfirmPostDelete = async () => {
     try {
       await postsAPI.deletePost(deletingPostId);
-      
+
       // Remove the post from state
-      setPosts(prevPosts => 
-        prevPosts.filter(post => post._id !== deletingPostId)
+      setPosts((prevPosts) =>
+        prevPosts.filter((post) => post._id !== deletingPostId)
       );
-      
+
       // Close the confirmation dialog
       setShowDeleteConfirmation(false);
       setDeletingPostId(null);
@@ -166,7 +164,7 @@ export default function Home() {
 
   const handleLoadMore = () => {
     if (pagination.page < pagination.totalPages) {
-      setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+      setPagination((prev) => ({ ...prev, page: prev.page + 1 }));
     }
   };
 
@@ -175,17 +173,34 @@ export default function Home() {
   // Format date for display
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit', 
-      minute: '2-digit'
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   // Check if current user is the post owner
   const isPostOwner = (post) => {
-    return post.user_id._id === user.id;
+    // Ensure we're comparing the right values regardless of object structure
+    const postUser = post.user_id;
+
+    // Get post user ID in different possible formats
+    let postUserId;
+    if (typeof postUser === "object") {
+      // It's a populated user object, get the ID
+      postUserId = postUser._id || postUser.id;
+    } else {
+      // It's already an ID (string or ObjectId)
+      postUserId = postUser;
+    }
+
+    // Get current user ID - it might be in different properties
+    const currentUserId = user.id || user._id;
+
+    // Convert both to strings and trim for reliable comparison
+    return String(postUserId).trim() === String(currentUserId).trim();
   };
 
   return (
@@ -193,9 +208,7 @@ export default function Home() {
       {/* Modern Header with User Info */}
       <header className="app-header">
         <div className="user-profile" onClick={() => setShowConfirmation(true)}>
-          <div className="avatar">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
+          <div className="avatar">{user.name.charAt(0).toUpperCase()}</div>
           <div className="user-info">
             <p className="user-name">{user.name}</p>
             <p className="user-email">{user.email}</p>
@@ -210,7 +223,9 @@ export default function Home() {
             <div className="mini-avatar">
               {user.name.charAt(0).toUpperCase()}
             </div>
-            <span className="post-prompt">What's on your mind, {user.name.split(' ')[0]}?</span>
+            <span className="post-prompt">
+              What's on your mind, {user.name.split(" ")[0]}?
+            </span>
           </div>
           <form onSubmit={handlePostSubmit} className="post-form">
             <textarea
@@ -222,8 +237,8 @@ export default function Home() {
             />
             {postError && <div className="post-error">{postError}</div>}
             <div className="post-actions">
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="post-button"
                 disabled={!postContent.trim() || creatingPost}
               >
@@ -248,7 +263,7 @@ export default function Home() {
         {/* News Feed with Modern Design */}
         <div className="feed-container">
           <h2 className="feed-title">Recent Posts</h2>
-          
+
           {postsLoading && posts.length === 0 ? (
             <div className="feed-loading">
               <LoadingSpinner size="medium" />
@@ -263,7 +278,7 @@ export default function Home() {
           ) : (
             <>
               <div className="posts-list">
-                {posts.map(post => (
+                {posts.map((post) => (
                   <div key={post._id} className="post-card">
                     <div className="post-card-header">
                       <div className="mini-avatar">
@@ -271,20 +286,22 @@ export default function Home() {
                       </div>
                       <div className="post-info">
                         <div className="post-author">{post.user_id.name}</div>
-                        <div className="post-time">{formatDate(post.createdAt)}</div>
+                        <div className="post-time">
+                          {formatDate(post.createdAt)}
+                        </div>
                       </div>
-                      
+
                       {/* Post Actions (Edit/Delete) for post owner */}
                       {isPostOwner(post) && (
                         <div className="post-actions-menu">
-                          <button 
+                          <button
                             className="post-action-btn edit"
                             onClick={() => handleEditPost(post)}
                             title="Edit post"
                           >
                             ✏️
                           </button>
-                          <button 
+                          <button
                             className="post-action-btn delete"
                             onClick={() => handleDeletePrompt(post._id)}
                             title="Delete post"
@@ -294,7 +311,7 @@ export default function Home() {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Show edit form or regular content */}
                     {editingPostId === post._id ? (
                       <div className="post-edit-form">
@@ -305,14 +322,14 @@ export default function Home() {
                           disabled={updatingPost}
                         />
                         <div className="edit-actions">
-                          <button 
+                          <button
                             onClick={() => handleSaveEdit(post._id)}
                             className="save-edit-btn"
                             disabled={!editContent.trim() || updatingPost}
                           >
-                            {updatingPost ? 'Saving...' : 'Save'}
+                            {updatingPost ? "Saving..." : "Save"}
                           </button>
-                          <button 
+                          <button
                             onClick={handleCancelEdit}
                             className="cancel-edit-btn"
                             disabled={updatingPost}
@@ -327,14 +344,14 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-              
+
               {pagination.page < pagination.totalPages && (
-                <button 
-                  onClick={handleLoadMore} 
+                <button
+                  onClick={handleLoadMore}
                   className="load-more-button"
                   disabled={postsLoading}
                 >
-                  {postsLoading ? 'Loading...' : 'Load More'}
+                  {postsLoading ? "Loading..." : "Load More"}
                 </button>
               )}
             </>
@@ -348,14 +365,19 @@ export default function Home() {
           <div className="modal-card">
             <div className="modal-header">
               <h3>Account Options</h3>
-              <button className="close-button" onClick={handleCancelDelete}>×</button>
+              <button className="close-button" onClick={handleCancelDelete}>
+                ×
+              </button>
             </div>
             <div className="modal-content">
               <div className="account-option" onClick={handleLogout}>
                 <span className="option-icon">🚪</span>
                 <span className="option-text">Log Out</span>
               </div>
-              <div className="account-option danger" onClick={handleConfirmDelete}>
+              <div
+                className="account-option danger"
+                onClick={handleConfirmDelete}
+              >
                 <span className="option-icon">⚠️</span>
                 <span className="option-text">Delete Account</span>
               </div>
@@ -380,23 +402,23 @@ export default function Home() {
           <div className="modal-card small">
             <div className="modal-header">
               <h3>Delete Post</h3>
-              <button className="close-button" onClick={handleCancelDelete}>×</button>
+              <button className="close-button" onClick={handleCancelDelete}>
+                ×
+              </button>
             </div>
             <div className="modal-content">
               <p className="confirmation-message">
-                Are you sure you want to delete this post? This action cannot be undone.
+                Are you sure you want to delete this post? This action cannot be
+                undone.
               </p>
               <div className="confirmation-actions">
-                <button 
+                <button
                   className="confirm-delete-btn"
                   onClick={handleConfirmPostDelete}
                 >
                   Delete
                 </button>
-                <button 
-                  className="cancel-btn"
-                  onClick={handleCancelDelete}
-                >
+                <button className="cancel-btn" onClick={handleCancelDelete}>
                   Cancel
                 </button>
               </div>

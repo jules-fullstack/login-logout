@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import AuthContext from "./authUtils";
-import { authAPI } from "../utils/api";
+import { authAPI, setAuthToken, initializeAuth } from "../utils/api";
 import axios from "axios";
 
 // Add this to access the API_URL
@@ -19,6 +19,9 @@ export function AuthProvider({ children }) {
     const checkAuth = async () => {
       try {
         setLoading(true);
+        
+        // Initialize auth token from localStorage
+        initializeAuth();
 
         // Skip cookie checks and directly try to get auth status
         try {
@@ -35,6 +38,9 @@ export function AuthProvider({ children }) {
               {},
               { withCredentials: true }
             );
+            
+            // Reinitialize auth after token refresh
+            initializeAuth();
 
             // Then try to get user data again
             const userRes = await authAPI.getUser();
@@ -54,12 +60,15 @@ export function AuthProvider({ children }) {
 
     checkAuth();
   }, []);
+  
   useEffect(() => {
     if (!user) return;
 
     const refreshInterval = setInterval(async () => {
       try {
         await authAPI.refreshToken();
+        // Reinitialize auth after token refresh
+        initializeAuth();
       } catch (err) {
         console.error("Token refresh failed:", err);
         setUser(null);
@@ -86,6 +95,11 @@ export function AuthProvider({ children }) {
           userId: res.data.userId,
           email,
         };
+      }
+
+      // Set auth token if received
+      if (res.data.token) {
+        setAuthToken(res.data.token);
       }
 
       setUser(res.data.user);
@@ -115,6 +129,12 @@ export function AuthProvider({ children }) {
 
     try {
       const res = await authAPI.verifyOtp(pendingOtpVerification.userId, otp);
+      
+      // Set auth token if received
+      if (res.data.token) {
+        setAuthToken(res.data.token);
+      }
+      
       setUser(res.data.user);
       setPendingOtpVerification(null);
 
@@ -151,6 +171,8 @@ export function AuthProvider({ children }) {
       console.error("Logout error:", err);
     }
 
+    // Clear auth token
+    setAuthToken(null);
     setUser(null);
   };
 
@@ -195,6 +217,11 @@ export function AuthProvider({ children }) {
         "processedVerificationTokens",
         JSON.stringify(processedTokens)
       );
+
+      // Set auth token if received
+      if (res.data.token) {
+        setAuthToken(res.data.token);
+      }
 
       setUser(res.data.user);
 
@@ -258,6 +285,11 @@ export function AuthProvider({ children }) {
     try {
       const res = await authAPI.resetPassword(token, password);
 
+      // Set auth token if received
+      if (res.data.token) {
+        setAuthToken(res.data.token);
+      }
+
       setUser(res.data.user);
 
       return { success: true };
@@ -288,6 +320,8 @@ export function AuthProvider({ children }) {
     try {
       await authAPI.deleteAccount();
 
+      // Clear auth token
+      setAuthToken(null);
       setUser(null);
 
       return true;
@@ -331,6 +365,8 @@ export function AuthProvider({ children }) {
   const refreshToken = async () => {
     try {
       await authAPI.refreshToken();
+      // Reinitialize auth after token refresh
+      initializeAuth();
       return true;
     } catch (err) {
       console.error("Manual token refresh failed:", err);

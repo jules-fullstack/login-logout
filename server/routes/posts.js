@@ -87,8 +87,8 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ msg: "Post not found" });
     }
 
-    // Check if user is the owner of the post
-    if (post.user_id.toString() !== req.user.id) {
+    // Check if user is the owner of the post - convert both to strings
+    if (String(post.user_id) !== String(req.user.id)) {
       return res.status(403).json({ msg: "Not authorized to update this post" });
     }
 
@@ -122,8 +122,8 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ msg: "Post not found" });
     }
 
-    // Check if user is the owner of the post
-    if (post.user_id.toString() !== req.user.id) {
+    // Check if user is the owner of the post - convert both to strings
+    if (String(post.user_id) !== String(req.user.id)) {
       return res.status(403).json({ msg: "Not authorized to delete this post" });
     }
 
