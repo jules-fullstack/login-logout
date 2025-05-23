@@ -7,6 +7,7 @@ const Token = require("../models/Token");
 const mongoose = require("mongoose");
 const authMiddleware = require("../middleware/auth");
 const { jwtHelpers } = require("../config/jwt");
+const apiAuth = require("../middleware/apiAuth");
 const {
   sendPasswordResetEmail,
   sendWelcomeEmail,

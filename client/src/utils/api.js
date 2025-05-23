@@ -25,7 +25,40 @@ const api = axios.create({
 
 const methodsRequiringCsrf = ["post", "put", "delete", "patch"];
 
+const setAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    localStorage.setItem('authToken', token);
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+    localStorage.removeItem('authToken');
+  }
+};
+
+// Initialize token from storage
+const token = localStorage.getItem('authToken');
+if (token) {
+  setAuthToken(token);
+}
+
 let csrfToken = null;
+
+// Export post-related API functions
+export const postsAPI = {
+  getPosts: (page = 1, limit = 10) => 
+    api.get(`/api/posts?page=${page}&limit=${limit}`),
+  createPost: (content) => 
+    api.post('/api/posts', { content }),
+  updatePost: (id, content) => 
+    api.put(`/api/posts/${id}`, { content }),
+  deletePost: (id) => 
+    api.delete(`/api/posts/${id}`),
+  apiLogin: (email, password) => 
+    api.post('/api/auth/login', { email, password }),
+};
+
+// Export the setAuthToken function
+export { setAuthToken };
 
 api.interceptors.request.use(
   async (config) => {

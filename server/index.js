@@ -34,7 +34,7 @@ const corsOptions = {
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'x-auth-token', 'X-CSRF-Token']
+  allowedHeaders: ['Content-Type', 'x-auth-token', 'X-CSRF-Token', 'Authorization']
 };
 
 app.use(cors(corsOptions));
@@ -95,6 +95,9 @@ app.get('/api/csrf-token', (req, res) => {
 });
 
 app.use("/api/auth", require("./routes/auth"));
+app.use("/api", require("./routes/api"));
+app.use("/api/posts", require("./routes/posts"));
+
 
 mongoose
   .connect(process.env.MONGO_URI)
